@@ -1,4 +1,6 @@
 import requests
+import time
+from datetime import datetime
 
 # Define new data to create
 new_data = {
@@ -10,8 +12,15 @@ url_post = "https://store-api.empiricus.com.br/commerce/v1/storefront/livro-crip
 #Exemplo URL Available = True
 #"https://store-api.empiricus.com.br/commerce/v1/storefront/livro-cripto-wars-avulso"
 
+print(f"Hora antes da requisição: {datetime.now()}")
+t1 = time.perf_counter_ns()
+
 # A POST request to the API
 post_response = requests.post(url_post, json=new_data)
+
+t2 = time.perf_counter_ns()
+print(f"Hora depois da requisição: {datetime.now()}")
+print(f"Duração da requisição: {(t2 - t1)/1000000000} segundos\n")
 
 # Print status code from original response (not JSON)
 print("Status Code:",post_response.status_code)
