@@ -10,43 +10,41 @@ def getKeyFromFile():
     with open("key.key", "rb") as keyFile:
         return keyFile.read()
 
-def saveTextToFile(string):
-    with open("cryptography_test.txt", "wb") as cryptographyTestFile:
-        cryptographyTestFile.write(string)
-    print("Text saved to file cryptography_test.txt\n")
+def getFileContent(filename):
+    with open(filename, "rb") as readfile:
+        return readfile.read()
 
-def getEncryptedTextFromFile():
-    with open("cryptography_test.txt", "rb") as cryptographyTestFile:
-        return cryptographyTestFile.read()
+def setFileContent(filename, data):
+    with open(filename, "wb") as writefile:
+        writefile.write(data)
+    print(f"Saved changes to file {filename}\n")
+
+def encrypt(filepath, key):
+    cryptographyObject = Fernet(key)
+
+    encrypted_data = cryptographyObject.encrypt(getFileContent(filepath))
+    setFileContent(filepath, encrypted_data)
+
+def decrypt(filepath, key):
+    cryptographyObject = Fernet(key)
+
+    decrypted_data = cryptographyObject.decrypt(getFileContent(filepath))
+    setFileContent(filepath, decrypted_data)
 
 if (int(input("Generate new key? (0 - No | 1 - Yes) ")) > 0):
     generateKeyFile()
     print("New key generated\n")
 
-if (int(input("Encrypt text? (0 - No | 1 - Yes) ")) > 0):
+if (int(input("Encrypt file? (0 - No | 1 - Yes) ")) > 0):
     key = getKeyFromFile()
-    print("Key type:", type(key))
-    print(f"Encryption key: {key}\n") #Just for test purposes
-    text = input("Type some text to be encrypted: ").encode()
-    print("Text type:", type(text))
+    file = input("Type the full path of the file to be encrypted (file included): ")
 
-    #Initialize the Fernet class
-    cryptographyObject = Fernet(key)
-    encryptedText = cryptographyObject.encrypt(text)
-    print("Encrypted text type:", type(encryptedText))
-    print(f"Encrypted text: {encryptedText}\n")
-    saveTextToFile(encryptedText)
+    encrypt(file, key)
 
-if (int(input("Decrypt text? (0 - No | 1 - Yes) ")) > 0):
+if (int(input("Decrypt file? (0 - No | 1 - Yes) ")) > 0):
     key = getKeyFromFile()
-    print(f"Encryption key: {key}\n") #Just for test purposes
-    encryptedText = getEncryptedTextFromFile()
-    print("Encrypted text type:", type(encryptedText))
+    file = input("Type the full path of the file to be decrypted (file included): ")
 
-    cryptographyObject = Fernet(key)
-    decryptedText = cryptographyObject.decrypt(encryptedText)
-    print("Decrypted text type:", type(decryptedText))
-    print(f"Decrypted text: {decryptedText}\n")
-    saveTextToFile(decryptedText)
+    decrypt(file, key)
 
 print("\n*************** End of program ***************")
