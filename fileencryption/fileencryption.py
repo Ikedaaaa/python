@@ -4,19 +4,20 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 import hashlib
 import secrets
 import base64
+import getpass
 
 def getPassword():
     with open("password.hash", "rb") as pwdFile:
         return pwdFile.read()
 
 def setPassword():
-    senha1 = input("\nType your new password: ")
-    senha2 = input("Confirm your new password: ")
+    senha1 = getpass.getpass("\nType your new password: ")
+    senha2 = getpass.getpass("Confirm your new password: ")
 
     while senha1 != senha2:
         print("\nTHE PASSWORDS DON'T MATCH\n")
-        senha1 = input("Type your new password: ")
-        senha2 = input("Confirm your new password: ")
+        senha1 = getpass.getpass("Type your new password: ")
+        senha2 = getpass.getpass("Confirm your new password: ")
 
     if (int(input("Generate new salt? (0 - No | 1 - Yes) ")) > 0):
         saltSize = int(input("Salt size (0 to use the standard size 16): "))
@@ -37,7 +38,7 @@ def resetPassword():
     try:
         password_hash = getPassword()
 
-        password_old = input("\nType your old password: ")
+        password_old = getpass.getpass("\nType your old password: ")
         salt = loadSalt()
 
         if checkPassword(password_old, salt, password_hash):
@@ -115,7 +116,7 @@ if opcao == 1:
     resetPassword()
 elif opcao == 2:
     file = input("Type the full path of the file to be encrypted/decrypted (file included): ")
-    pwd = input("Type your password: ")
+    pwd = getpass.getpass("Type your password: ")
     decrypt(file, pwd)
 
 print("\n*************** End of program ***************")
