@@ -10,16 +10,16 @@ def getPassword():
         return pwdFile.read()
 
 def setPassword():
-    senha1 = input("\nDigite uma senha: ")
-    senha2 = input("Confirme sua senha: ")
+    senha1 = input("\nType your new password: ")
+    senha2 = input("Confirm your new password: ")
 
     while senha1 != senha2:
-        print("\nAS SENHAS NÃO CONFEREM\n")
-        senha1 = input("Digite uma senha: ")
-        senha2 = input("Confirme sua senha: ")
+        print("\nTHE PASSWORDS DON'T MATCH\n")
+        senha1 = input("Type your new password: ")
+        senha2 = input("Confirm your new password: ")
 
     if (int(input("Generate new salt? (0 - No | 1 - Yes) ")) > 0):
-        saltSize = int(input("Salt size (0 to use standard the size 16): "))
+        saltSize = int(input("Salt size (0 to use the standard size 16): "))
         salt = generateSalt((saltSize if saltSize > 0 else 16))
         with open("salt.salt", "wb") as saltFile:
             saltFile.write(salt)
@@ -31,20 +31,20 @@ def setPassword():
     with open("password.hash", "wb") as pwdFile:
         pwdFile.write(hashlib.sha256(saltedPassword).hexdigest().encode())
 
-    print("\nNova senha definida com sucesso\n")
+    print("\nNew password set successfully\n")
 
 def resetPassword():
     try:
         password_hash = getPassword()
 
-        password_old = input("\nDigite sua senha antiga: ")
+        password_old = input("\nType your old password: ")
         salt = loadSalt()
 
         if checkPassword(password_old, salt, password_hash):
-            print("\nRedefinição de senha:")
+            print("\nReset password:")
             setPassword()
         else:
-            print("\nAS SENHAS NÃO CONFEREM")
+            print("\nPASSWORDS DON'T MATCH")
         
     except FileNotFoundError:
         setPassword()
@@ -101,15 +101,15 @@ def decrypt(filepath, pwd):
     else:
         print("\nWARNING: Wrong Password\n")
 
-print("\nEscolha uma opção:")
-print("1. Definir/Redefinir senha para criptografia;")
-print("2. Criptografar/Descriptografar arquivo;")
-print("0. Encerrar programa.\n")
+print("\nChoose an option:")
+print("1. Set/Reset a password for cryptography;")
+print("2. Encrypt/Decrypt file;")
+print("0. End program.\n")
 
-opcao = int(input("Opção: "))
+opcao = int(input("Option: "))
 while opcao not in [0, 1, 2]:
-    print("OPÇÃO INVÁLIDA!")
-    opcao = int(input("Opção: "))
+    print("INVALID OPTION!")
+    opcao = int(input("Option: "))
 
 if opcao == 1:
     resetPassword()
