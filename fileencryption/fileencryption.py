@@ -26,10 +26,7 @@ def setPassword():
     else:
         salt = loadSalt()
 
-    #print(f"\nSalt: {salt}\n") #Delete after test
-
     saltedPassword = senha1.encode("utf-8") + salt
-    #print(f"\nSalted Password: {saltedPassword}\n") #Delete after test
 
     with open("password.hash", "wb") as pwdFile:
         pwdFile.write(hashlib.sha256(saltedPassword).hexdigest().encode())
@@ -42,7 +39,6 @@ def resetPassword():
 
         password_old = input("\nDigite sua senha antiga: ")
         salt = loadSalt()
-        #print(f"\nSalt: {salt}\n") #Delete after test
 
         if checkPassword(password_old, salt, password_hash):
             print("\nRedefinição de senha:")
@@ -55,13 +51,10 @@ def resetPassword():
 
 def checkPassword(password_input, salt, password_old_hash=""):
     password_hash = getPassword() if password_old_hash == "" else password_old_hash
-    #print(f"\nPassword Hash: {password_hash}\n") #Delete after test
-    #print(f"\nPassword Input: {password_input}\n") #Delete after test
-    #print(f"\nSalt: {salt}\n") #Delete after test
+    
     salted_password = password_input.encode("utf-8") + salt
-    #print(f"\nSalted Password: {salted_password}\n") #Delete after test
     password_input_hash = hashlib.sha256(salted_password).hexdigest().encode()
-    #print(f"\nPassword Input Hash: {password_input_hash}\n") #Delete after test
+    
     return password_input_hash == password_hash
 
 def generateSalt(size):
@@ -79,7 +72,6 @@ def generateKey(password, salt): #, salt_size, generateSalt
     #generate key from salt and password and encode it using Base 64
     print("\nDeriving Criptography key from password\n")
     derived_key = deriveKey(salt, password)
-    #print(f"\nDerived Key: {derived_key}\n")
     return base64.urlsafe_b64encode(derived_key)
 
 def getFileContent(filename):
@@ -99,7 +91,6 @@ def decrypt(filepath, pwd):
     salt = loadSalt()
     if checkPassword(pwd, salt):
         key = generateKey(pwd, salt)
-        #print(f"\nCriptography Key: {key}\n")
         cryptographyObject = Fernet(key)
         try:
             decrypted_data = cryptographyObject.decrypt(getFileContent(filepath))
