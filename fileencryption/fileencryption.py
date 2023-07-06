@@ -1,10 +1,9 @@
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
-import hashlib
-import secrets
 import base64
 import getpass
+import bcrypt
 
 def getPassword():
     with open("password.hash", "rb") as pwdFile:
@@ -20,17 +19,17 @@ def setPassword():
         senha2 = getpass.getpass("Confirm your new password: ")
 
     if (int(input("Generate new salt? (0 - No | 1 - Yes) ")) > 0):
-        saltSize = int(input("Salt size (0 to use the standard size 16): "))
-        salt = generateSalt((saltSize if saltSize > 0 else 16))
+        workFactor = int(input("Salt size (0 to use the standard size 12): "))
+        salt = generateSalt((workFactor if workFactor > 0 else 12))
         with open("salt.salt", "wb") as saltFile:
             saltFile.write(salt)
     else:
         salt = loadSalt()
+        workFactor = int(salt.decode().split("$")[2])
 
-    saltedPassword = senha1.encode("utf-8") + salt
-
+    print(f"\nGenerating new Bcrypt hash with Work Factor of {workFactor}")
     with open("password.hash", "wb") as pwdFile:
-        pwdFile.write(hashlib.sha256(saltedPassword).hexdigest().encode())
+        pwdFile.write(bcrypt.hashpw(senha1.encode(), salt))
 
     print("\nNew password set successfully\n")
 
@@ -39,10 +38,9 @@ def resetPassword():
         password_hash = getPassword()
 
         password_old = getpass.getpass("\nType your old password: ")
-        salt = loadSalt()
 
-        if checkPassword(password_old, salt, password_hash):
-            print("\nReset password:")
+        if checkPassword(password_old, password_hash):
+            print("****** Reset password ******")
             setPassword()
         else:
             print("\nPASSWORDS DON'T MATCH")
@@ -50,16 +48,13 @@ def resetPassword():
     except FileNotFoundError:
         setPassword()
 
-def checkPassword(password_input, salt, password_old_hash=""):
+def checkPassword(password_input, password_old_hash=""):
+    print(f"\nChecking Password\n")
     password_hash = getPassword() if password_old_hash == "" else password_old_hash
-    
-    salted_password = password_input.encode("utf-8") + salt
-    password_input_hash = hashlib.sha256(salted_password).hexdigest().encode()
-    
-    return password_input_hash == password_hash
+    return bcrypt.checkpw(password_input.encode(), password_hash)
 
-def generateSalt(size):
-    return secrets.token_bytes(size)
+def generateSalt(work_factor):
+    return bcrypt.gensalt(rounds=work_factor)
 
 def loadSalt():
     with open("salt.salt", "rb") as saltFile:
@@ -69,7 +64,7 @@ def deriveKey(salt, password):
     kdf = Scrypt(salt=salt, length=32, n=2**20, r=8, p=1)
     return kdf.derive(password.encode())
 
-def generateKey(password, salt): #, salt_size, generateSalt
+def generateKey(password, salt):
     #generate key from salt and password and encode it using Base 64
     print("\nDeriving Criptography key from password\n")
     derived_key = deriveKey(salt, password)
@@ -89,9 +84,8 @@ def encrypt(filepath, cryptographyObject):
     print(f"File {filepath} ENCRYPTED\n")
 
 def decrypt(filepath, pwd):
-    salt = loadSalt()
-    if checkPassword(pwd, salt):
-        key = generateKey(pwd, salt)
+    if checkPassword(pwd):
+        key = generateKey(pwd, loadSalt())
         cryptographyObject = Fernet(key)
         try:
             decrypted_data = cryptographyObject.decrypt(getFileContent(filepath))
