@@ -4,6 +4,7 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 import base64
 import getpass
 import bcrypt
+import logging
 
 def getPassword():
     with open("password.hash", "rb") as pwdFile:
@@ -14,7 +15,7 @@ def setPassword():
     senha2 = getpass.getpass("Confirm your new password: ")
 
     while senha1 != senha2:
-        print("\nTHE PASSWORDS DON'T MATCH\n")
+        logging.warning("THE PASSWORDS DON'T MATCH\n")
         senha1 = getpass.getpass("Type your new password: ")
         senha2 = getpass.getpass("Confirm your new password: ")
 
@@ -27,11 +28,11 @@ def setPassword():
         salt = loadSalt()
         workFactor = int(salt.decode().split("$")[2])
 
-    print(f"\nGenerating new Bcrypt hash with Work Factor of {workFactor}")
+    logging.info(f"Generating new Bcrypt hash with Work Factor of {workFactor}\n")
     with open("password.hash", "wb") as pwdFile:
         pwdFile.write(bcrypt.hashpw(senha1.encode(), salt))
 
-    print("\nNew password set successfully\n")
+    logging.info("New password set successfully\n")
 
 def resetPassword():
     try:
@@ -43,13 +44,13 @@ def resetPassword():
             print("****** Reset password ******")
             setPassword()
         else:
-            print("\nPASSWORDS DON'T MATCH")
+            logging.error("PASSWORDS DON'T MATCH")
         
     except FileNotFoundError:
         setPassword()
 
 def checkPassword(password_input, password_old_hash=""):
-    print(f"\nChecking Password\n")
+    logging.info(f"Checking Password\n")
     password_hash = getPassword() if password_old_hash == "" else password_old_hash
     return bcrypt.checkpw(password_input.encode(), password_hash)
 
@@ -66,7 +67,7 @@ def deriveKey(salt, password):
 
 def generateKey(password, salt):
     #generate key from salt and password and encode it using Base 64
-    print("\nDeriving Criptography key from password\n")
+    logging.info("Deriving Criptography key from password\n")
     derived_key = deriveKey(salt, password)
     return base64.urlsafe_b64encode(derived_key)
 
@@ -81,7 +82,7 @@ def setFileContent(filename, data):
 def encrypt(filepath, cryptographyObject):
     encrypted_data = cryptographyObject.encrypt(getFileContent(filepath))
     setFileContent(filepath, encrypted_data)
-    print(f"File {filepath} ENCRYPTED\n")
+    logging.info(f"File {filepath} ENCRYPTED\n")
 
 def decrypt(filepath, pwd):
     if checkPassword(pwd):
@@ -90,11 +91,13 @@ def decrypt(filepath, pwd):
         try:
             decrypted_data = cryptographyObject.decrypt(getFileContent(filepath))
             setFileContent(filepath, decrypted_data)
-            print(f"File {filepath} DECRYPTED\n")
+            logging.info(f"File {filepath} DECRYPTED\n")
         except:
             encrypt(filepath, cryptographyObject)
     else:
-        print("\nWARNING: Wrong Password\n")
+        logging.error("WRONG PASSWORD\n")
+
+logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
 
 print("\nChoose an option:")
 print("1. Set/Reset a password for cryptography;")
@@ -103,7 +106,7 @@ print("0. End program.\n")
 
 opcao = int(input("Option: "))
 while opcao not in [0, 1, 2]:
-    print("INVALID OPTION!")
+    logging.warning("INVALID OPTION!")
     opcao = int(input("Option: "))
 
 if opcao == 1:
