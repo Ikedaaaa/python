@@ -29,18 +29,25 @@ def setPassword():
     logging.info("New password set successfully\n")
 
 def resetPassword():
+    qtnEncryptedFiles = getQtnEncryptedFiles()
     try:
         password_hash = getPassword()
 
-        password_old = getpass.getpass("\nType your old password: ")
+        if qtnEncryptedFiles <= 0:
+            password_old = getpass.getpass("\nType your old password: ")
 
-        if checkPassword(password_old, password_hash):
-            print("****** Reset password ******")
-            setPassword()
+            if checkPassword(password_old, password_hash):
+                print("****** Reset password ******")
+                setPassword()
+            else:
+                logging.error("PASSWORDS DON'T MATCH")
         else:
-            logging.error("PASSWORDS DON'T MATCH")
-        
+            logging.error(f"{encryptedFilesStr(qtnEncryptedFiles)} decrypt them before resetting your password")
+            changePwdWithEncryptedFilesInfo()
     except FileNotFoundError:
+        if qtnEncryptedFiles > 0:
+            logging.warning(f"{encryptedFilesStr(qtnEncryptedFiles)} but the password.hash file appears to be missing. Make sure to set the exact password that was used to encrypt these files previously\n")
+            changePwdWithEncryptedFilesInfo()
         setPassword()
 
 def checkPassword(password_input, password_old_hash=""):
@@ -74,6 +81,7 @@ def setFileContent(filename, data):
 def encrypt(filepath, cryptographyObject):
     encrypted_data = cryptographyObject.encrypt(getFileContent(filepath))
     setFileContent(filepath, encrypted_data)
+    setQtnEncryptedFiles(getQtnEncryptedFiles() + 1)
     logging.info(f"File {filepath} ENCRYPTED\n")
 
 def decrypt(filepath, pwd):
@@ -83,11 +91,31 @@ def decrypt(filepath, pwd):
         try:
             decrypted_data = cryptographyObject.decrypt(getFileContent(filepath))
             setFileContent(filepath, decrypted_data)
+            qtnEncryptedFiles = getQtnEncryptedFiles()
+            setQtnEncryptedFiles(((qtnEncryptedFiles - 1) if qtnEncryptedFiles > 1 else 0))
             logging.info(f"File {filepath} DECRYPTED\n")
         except:
             encrypt(filepath, cryptographyObject)
     else:
         logging.error("WRONG PASSWORD\n")
+
+def getQtnEncryptedFiles():
+    try:
+        with open("encryptedfiles.ctrl", "rb") as encryptedfiles_file:
+            return int(encryptedfiles_file.read().decode())
+    except FileNotFoundError:
+        setQtnEncryptedFiles(0)
+        return 0
+
+def setQtnEncryptedFiles(qtnEncryptedFiles):
+    with open("encryptedfiles.ctrl", "wb") as encryptedfiles_file:
+        encryptedfiles_file.write(str(qtnEncryptedFiles).encode())
+
+def encryptedFilesStr(x):
+    return f"There are {x} encrypted files in your computer,"
+
+def changePwdWithEncryptedFilesInfo():
+    logging.info(f"Decryption won't work if you change the password because the key used for encryption will not be the same")
 
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
 
