@@ -19,14 +19,8 @@ def setPassword():
         senha1 = getpass.getpass("Type your new password: ")
         senha2 = getpass.getpass("Confirm your new password: ")
 
-    if (int(input("Generate new salt? (0 - No | 1 - Yes) ")) > 0):
-        workFactor = int(input("Salt size (0 to use the standard size 12): "))
-        salt = generateSalt((workFactor if workFactor > 0 else 12))
-        with open("salt.salt", "wb") as saltFile:
-            saltFile.write(salt)
-    else:
-        salt = loadSalt()
-        workFactor = int(salt.decode().split("$")[2])
+    workFactor = int(input("Salt work factor (0 to use the standard = 12): "))
+    salt = generateSalt((workFactor if workFactor > 0 else 12))
 
     logging.info(f"Generating new Bcrypt hash with Work Factor of {workFactor}\n")
     with open("password.hash", "wb") as pwdFile:
@@ -56,19 +50,17 @@ def checkPassword(password_input, password_old_hash=""):
 
 def generateSalt(work_factor):
     return bcrypt.gensalt(rounds=work_factor)
-
-def loadSalt():
-    with open("salt.salt", "rb") as saltFile:
-        return saltFile.read()
     
-def deriveKey(salt, password):
-    kdf = Scrypt(salt=salt, length=32, n=2**20, r=8, p=1)
+def deriveKey(password):
+    #It would also be possible to use Bcrypt's kdf
+    #key = bcrypt.kdf(password=password.encode(), salt=salt, desired_key_bytes=32, rounds=1000)
+    kdf = Scrypt(salt=b'', length=32, n=2**21, r=8, p=1)
     return kdf.derive(password.encode())
 
-def generateKey(password, salt):
-    #generate key from salt and password and encode it using Base 64
+def generateKey(password):
+    #generate key from salt (not used anymore) and password and encode it using Base 64
     logging.info("Deriving Criptography key from password\n")
-    derived_key = deriveKey(salt, password)
+    derived_key = deriveKey(password)
     return base64.urlsafe_b64encode(derived_key)
 
 def getFileContent(filename):
@@ -86,7 +78,7 @@ def encrypt(filepath, cryptographyObject):
 
 def decrypt(filepath, pwd):
     if checkPassword(pwd):
-        key = generateKey(pwd, loadSalt())
+        key = generateKey(pwd)
         cryptographyObject = Fernet(key)
         try:
             decrypted_data = cryptographyObject.decrypt(getFileContent(filepath))
