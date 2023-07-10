@@ -5,6 +5,7 @@ import base64
 import getpass
 import bcrypt
 import logging
+import subprocess
 
 def getPassword():
     with open("password.hash", "rb") as pwdFile:
@@ -84,7 +85,8 @@ def encrypt(filepath, cryptographyObject):
     setQtnEncryptedFiles(getQtnEncryptedFiles() + 1)
     logging.info(f"File {filepath} ENCRYPTED\n")
 
-def decrypt(filepath, pwd):
+def decrypt(filepath, pwd, openAfterDecryption=False):
+    triedToOpenNotEncryptedFile = False
     if checkPassword(pwd):
         key = generateKey(pwd)
         cryptographyObject = Fernet(key)
@@ -95,7 +97,14 @@ def decrypt(filepath, pwd):
             setQtnEncryptedFiles(((qtnEncryptedFiles - 1) if qtnEncryptedFiles > 1 else 0))
             logging.info(f"File {filepath} DECRYPTED\n")
         except:
-            encrypt(filepath, cryptographyObject)
+            if not openAfterDecryption:
+                encrypt(filepath, cryptographyObject)
+            else:
+                triedToOpenNotEncryptedFile = True
+                logging.error("TO USE THIS OPTION, THE FILE NEEDS TO BE ENCRYPTED\n")
+        finally:
+            if openAfterDecryption and not triedToOpenNotEncryptedFile:
+                openFileAfterDecryption(filepath, cryptographyObject)
     else:
         logging.error("WRONG PASSWORD\n")
 
@@ -117,23 +126,61 @@ def encryptedFilesStr(x):
 def changePwdWithEncryptedFilesInfo():
     logging.info(f"Decryption won't work if you change the password because the key used for encryption will not be the same")
 
+def getFileExtension(file_name):
+    return file_name.split(".")[-1].lower()
+
+def getProcessToRun(file_path):
+    processes_list = [
+        [['txt'], 'notepad.exe'], 
+        [['pdf'], 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'],
+        [['docx', 'doc'], 'C:\Program Files\Microsoft Office\\root\Office16\winword.exe'],
+        [['xlsx', 'xls', 'csv'], 'C:\Program Files\Microsoft Office\\root\Office16\excel.exe']
+    ]
+    file_extension = getFileExtension(file_path)
+    for process in processes_list:
+        if file_extension in process[0]:
+            return True, file_extension, process[1]
+    return False, file_extension, 'File extension not supported yet'
+
+def openFileAfterDecryption(file_path, cryptography_object):
+    try:
+        fileExtensionSupported, fileExtension, process = getProcessToRun(file_path)
+        if fileExtensionSupported:
+            subprocess.run([process, file_path])
+            if fileExtension == 'pdf':
+                logging.warning("A pdf file doesn't wait for the process to be terminated before continuing the execution of the code.")
+                print("An input() was used to prevent the file from being encrypted immediately after trying to open it.")
+                print("The pdf would be encrypted again before the application could even load it.\n")
+                input("Press Enter to continue...")
+        else:
+            logging.error(f"{process}: {fileExtension}\n")
+    finally:
+        encrypt(file_path, cryptography_object)
+
+def onSelectEncryptionOption(open_after_decryption=False):
+    input_msg = "Type the full path of the file to be "+ ("" if open_after_decryption else "encrypted/") +"decrypted (file included): "
+    file = input(input_msg)
+    pwd = getpass.getpass("Type your password: ")
+    decrypt(file, pwd, open_after_decryption)
+
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
 
 print("\nChoose an option:")
 print("1. Set/Reset a password for cryptography;")
 print("2. Encrypt/Decrypt file;")
+print("3. Decrypt file and open it. When you close it, encrypt it again;")
 print("0. End program.\n")
 
 opcao = int(input("Option: "))
-while opcao not in [0, 1, 2]:
+while opcao not in [0, 1, 2, 3]:
     logging.warning("INVALID OPTION!")
     opcao = int(input("Option: "))
 
 if opcao == 1:
     resetPassword()
 elif opcao == 2:
-    file = input("Type the full path of the file to be encrypted/decrypted (file included): ")
-    pwd = getpass.getpass("Type your password: ")
-    decrypt(file, pwd)
+    onSelectEncryptionOption()
+elif opcao == 3:
+    onSelectEncryptionOption(True)
 
 print("\n*************** End of program ***************")
