@@ -31,11 +31,20 @@ Para avisar quando o livro está disponível de maneira automática, foram pensa
 
 ### Deixar script rodando
  - Seria necessário criar um tread para executar a parte da requisição periodicamente, a cada 24h ou mais, talvez.
- - A cada requisição, se retornasse "false" pra disponibilidade, seria feito apenas um log, para identificar que foi feita a requisição pelo menos
+ - A cada requisição, se retornasse "false" pra disponibilidade, seria feito apenas um log, para identificar que foi feita a requisição pelo menos (arquivo disponibilidadelivro.log)
  - A necessidade do log serviria também para identificar caso algo desse errado na requisição, como uma possível mudança na URL
  - Quando a disponibilidade se tornasse "true", seria chamado um sistema de notificação, como se fosse o email automático avisando que o livro voltou a ficar disponível
 
 ### Execução automática na inicialização do computador
  - A cada inicialização seria feita a requisição
- - Caso não estivesse disponível, seria feito um log também
- - Quando se tornasse disponível, seria criado apenas um txt na Área de Trabalho, avisando que se tornou disponível
+ - Caso não estivesse disponível, seria feito um log também (arquivo disponibilidadelivro.log)
+ - Quando se tornasse disponível, seria criado apenas um txt em um local especificado, avisando que se tornou disponível
+
+#### Requisitos
+Para que o script gere um arquivo informando que o livro se tornou disponível, será necessário criar na própria pasta do arquivo disponibilidadelivro.py
+ - Um arquivo txt com nome *bookavailablefiledirectory.txt*
+
+O conteúdo deve ser apenas o local para ser gerado o arquivo alertando a disponibilidade do livro. **O nome do arquivo deve estar incluso**.
+Exemplos:
+ - C:\Users\<user>\Desktop\LIVRODISPONIVEL.TXT
+ - C:\Users\<user>\Downloads\the_book_is_available.txt

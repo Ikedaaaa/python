@@ -8,9 +8,13 @@ def isDifferentPrice(differentPrices, newPrice):
     for differentPrice in differentPrices:
         if newPrice == differentPrice[1]:
             return False
-    return True 
+    return True
 
-def logResponseData(response_data):
+def getWriteBookIsAvailableFileDirectory():
+    with open("bookavailablefiledirectory.txt", "r") as file:
+        return file.read().strip()
+
+def logResponseData(response_data, is_criptomoedas_request=False):
     prices = []
     different_prices = []
 
@@ -20,6 +24,9 @@ def logResponseData(response_data):
     is_available_for_sale = response_data_json.get("cart").get("offer").get("is_available_for_sale")
     availability = response_data_json.get("cart").get("offer").get("availability")
     offer_items = response_data_json.get("cart").get("offer").get("offer_items")[0]
+
+    error_code = availability.get('error_code')
+    available = availability.get('available')
 
     prices.append(['cart.offer.price', response_data_json.get("cart").get("offer").get("price")])
     prices.append(['cart.offer.offer_price.price', response_data_json.get("cart").get("offer").get("offer_price")[0].get("price")])
@@ -35,34 +42,45 @@ def logResponseData(response_data):
 
     bookName = offer_items.get("plan_data").get("product_data").get("name")
 
-    print("\n\nStatus Code:",status_code)
+    if status_code != 200:
+        logging.warning(f"Status Code: {status_code}")
 
-    print(f"Book Name: {bookName}\n")
-
-    if len(different_prices) == 1:
-        print("PRICE")
-        print(f"R${'%.2f' % different_prices[0][1]}")
+    logging.info(f"Book Name: {bookName}")
+    logging.warning(f"Error Code: {error_code}")
+    if is_criptomoedas_request:
+        logging.warning(f"Available: {available}\n")
     else:
-        print("PRICES")
-        for different_price in different_prices:
-            print(f"{different_price[0]}: R${'%.2f' % different_price[1]}")
+        logging.warning(f"Available: {available}\n\n")
 
-    print(f"Is Available For Sale: {is_available_for_sale}\n")
+    if is_criptomoedas_request and available:
+        with open(getWriteBookIsAvailableFileDirectory(), 'w') as write_file:
+            write_file.write(f"Book Name: {bookName}\n")
+            write_file.write(f"Is Available For Sale: {is_available_for_sale}\n\n")
+            write_file.write(f"AVAILABILITY:\n")
+            write_file.write(f"Error Code: {error_code}\n")
+            write_file.write(f"Available: {available}\n\n")
 
-    print(f"AVAILABILITY:")
-    print(f"Error Code: {availability.get('error_code')}")
-    print(f"Available: {availability.get('available')}\n\n")
-
+            if len(different_prices) == 1:
+                write_file.write("PRICE\n")
+                write_file.write(f"R${'%.2f' % different_prices[0][1]}\n\n")
+            else:
+                write_file.write("PRICES\n")
+                for different_price in different_prices:
+                    write_file.write(f"{different_price[0]}: R${'%.2f' % different_price[1]}\n")
+                write_file.write("\n\n")
 
 # Define new data to create
 new_data = {
     "payment_method": "creditCard"
 }
-'''
-filename='disponibilidadelivro.log',
+
+logging.basicConfig(
+    filename='disponibilidadelivro.log',
     filemode='a',
-'''
-logging.basicConfig(format='[%(levelname)s] %(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S', level=logging.DEBUG)
+    format='[%(levelname)s] %(asctime)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    level=logging.DEBUG
+)
 
 #URL "Available = False" at the moment
 url_criptomoedas = "https://store-api.empiricus.com.br/commerce/v1/storefront/livro-criptomoedas-avulso"
@@ -73,16 +91,14 @@ url_criptowars = "https://store-api.empiricus.com.br/commerce/v1/storefront/livr
 try:
     logging.info(f"Making request to URL {url_criptomoedas}")
     response_criptomoedas = requests.post(url_criptomoedas, json=new_data)
+    logResponseData(response_criptomoedas, True)
 except Exception as e:
     logging.exception(getRequestExceptionString(url_criptomoedas, new_data))
-
-logResponseData(response_criptomoedas)
 
 # Request to Criptowars book URL
 try:
     logging.info(f"Making request to URL {url_criptowars}")
     response_criptowars = requests.post(url_criptowars, json=new_data)
+    logResponseData(response_criptowars)
 except Exception as e:
     logging.exception(getRequestExceptionString(url_criptowars, new_data))
-
-logResponseData(response_criptowars)
