@@ -46,5 +46,5 @@ Para que o script gere um arquivo informando que o livro se tornou disponível, 
 
 O conteúdo deve ser apenas o local para ser gerado o arquivo alertando a disponibilidade do livro. **O nome do arquivo deve estar incluso**.
 Exemplos:
- - C:\Users\\<user>\Desktop\LIVRODISPONIVEL.TXT
- - C:\Users\\<user>\Downloads\the_book_is_available.txt
+ - C:\Users\user\Desktop\LIVRODISPONIVEL.TXT
+ - C:\Users\user\Downloads\the_book_is_available.txt
