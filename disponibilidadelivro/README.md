@@ -40,6 +40,12 @@ Para avisar quando o livro está disponível de maneira automática, foram pensa
  - Caso não estivesse disponível, seria feito um log também (arquivo disponibilidadelivro.log)
  - Quando se tornasse disponível, seria criado apenas um txt em um local especificado, avisando que se tornou disponível
 
+Para permitir a execução na inicialização, foi gerado um executável do script python usando o pyinstaller:
+ - pyinstaller --onefile executeonstartup\disponibilidadelivro.py
+
+Para executar o programa na inicialização do computador, foi criada Tarefa Agendada, usando o Task Scheduler do Windows seguindo as orientações do site:
+ - https://answers.microsoft.com/en-us/windows/forum/all/running-program-on-return-from-standbyhibernate/72150ea7-22f2-4043-93b0-aad517c28fc0
+
 #### Requisitos
 Para que o script gere um arquivo informando que o livro se tornou disponível, será necessário criar na própria pasta do arquivo disponibilidadelivro.py
  - Um arquivo txt com nome *bookavailablefiledirectory.txt*
