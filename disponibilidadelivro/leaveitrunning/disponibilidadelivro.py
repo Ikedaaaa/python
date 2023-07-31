@@ -3,6 +3,10 @@ import logging
 import smtplib
 from email.message import EmailMessage
 import requests
+import schedule
+import time
+
+reschedule = True
 
 def getRequestExceptionString(url, data):
     return f"An exception occurred during request to URL:\n{url}\nWith request data:\n{data}\n"
@@ -84,6 +88,7 @@ def sendEmail(bookName, availableForSale, errorCode, isAvailable, differentPrice
         logging.exception(f"An exception occurred during an attempt to send an email from {mailfrom} to {mailto}")
 
 def logResponseData(response_data, is_criptomoedas_request=False):
+    global reschedule
     prices = []
     different_prices = []
 
@@ -120,11 +125,35 @@ def logResponseData(response_data, is_criptomoedas_request=False):
 
     if is_criptomoedas_request and available:
         sendEmail(book_name, is_available_for_sale, error_code, available, different_prices)
+        schedule.clear()
+        reschedule = False
 
-# Define new data to create
-new_data = {
-    "payment_method": "creditCard"
-}
+def makeHttpRequests():
+    # Define new data to create
+    new_data = {
+        "payment_method": "creditCard"
+    }
+
+    #URL "Available = False" at the moment
+    url_criptomoedas = "https://store-api.empiricus.com.br/commerce/v1/storefront/livro-criptomoedas-avulso"
+    #Exemplo URL "Available = True" at the moment
+    url_criptowars = "https://store-api.empiricus.com.br/commerce/v1/storefront/livro-cripto-wars-avulso"
+
+    # Request to Criptomoedas book URL
+    try:
+        logging.info(f"Making request to URL {url_criptomoedas}")
+        response_criptomoedas = requests.post(url_criptomoedas, json=new_data)
+        logResponseData(response_criptomoedas, True)
+    except Exception as e:
+        logging.exception(getRequestExceptionString(url_criptomoedas, new_data))
+
+    # Request to Criptowars book URL
+    try:
+        logging.info(f"Making request to URL {url_criptowars}")
+        response_criptowars = requests.post(url_criptowars, json=new_data)
+        logResponseData(response_criptowars)
+    except Exception as e:
+        logging.exception(getRequestExceptionString(url_criptowars, new_data))
 
 logging.basicConfig(
     filename='disponibilidadelivro.log',
@@ -134,23 +163,9 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
-#URL "Available = False" at the moment
-url_criptomoedas = "https://store-api.empiricus.com.br/commerce/v1/storefront/livro-criptomoedas-avulso"
-#Exemplo URL "Available = True" at the moment
-url_criptowars = "https://store-api.empiricus.com.br/commerce/v1/storefront/livro-cripto-wars-avulso"
+schedule.every().monday.at("12:00").do(makeHttpRequests)
+schedule.every().thursday.at("12:00").do(makeHttpRequests)
 
-# Request to Criptomoedas book URL
-try:
-    logging.info(f"Making request to URL {url_criptomoedas}")
-    response_criptomoedas = requests.post(url_criptomoedas, json=new_data)
-    logResponseData(response_criptomoedas, True)
-except Exception as e:
-    logging.exception(getRequestExceptionString(url_criptomoedas, new_data))
-
-# Request to Criptowars book URL
-try:
-    logging.info(f"Making request to URL {url_criptowars}")
-    response_criptowars = requests.post(url_criptowars, json=new_data)
-    logResponseData(response_criptowars)
-except Exception as e:
-    logging.exception(getRequestExceptionString(url_criptowars, new_data))
+while reschedule:
+    schedule.run_pending()
+    time.sleep(1)

@@ -65,9 +65,11 @@ Exemplos:
 
 ## Uso Externo
  - Requests library (https://pypi.org/project/requests/)
+ - Schedule Library (https://schedule.readthedocs.io/en/stable/)
 
 ## Sources
  - https://www.datacamp.com/tutorial/making-http-requests-in-python
  - https://docs.python.org/3/library/configparser.html
  - https://www.youtube.com/watch?v=N97q96BygUg
  - https://www.youtube.com/watch?v=LUyM7Nm1i9k
+ - https://www.geeksforgeeks.org/python-schedule-library/
