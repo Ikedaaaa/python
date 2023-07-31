@@ -1,3 +1,5 @@
 **\bookavailablefiledirectory.txt
 **\disponibilidadelivro.log
 **\disponibilidadelivro.exe
+*.cfg
+!*_sample.cfg

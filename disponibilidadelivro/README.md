@@ -35,6 +35,14 @@ Para avisar quando o livro está disponível de maneira automática, foram pensa
  - A necessidade do log serviria também para identificar caso algo desse errado na requisição, como uma possível mudança na URL
  - Quando a disponibilidade se tornasse "true", seria chamado um sistema de notificação, como se fosse o email automático avisando que o livro voltou a ficar disponível
 
+Para enviar o email, é necessário renomear o arquivo *email_sample.cfg* para *email.cfg* e alterar o conteúdo com:
+ - **mailto**=*email do destinatário*
+ - **mailfrom**=*email do remetente*
+ - **pwd**=*senha de app gerada pelo gerenciador de conta do gmail*
+
+Para gerar a senha de app:
+ - https://myaccount.google.com/apppasswords
+
 ### Execução automática na inicialização do computador
  - A cada inicialização seria feita a requisição
  - Caso não estivesse disponível, seria feito um log também (arquivo disponibilidadelivro.log)
@@ -54,3 +62,12 @@ O conteúdo deve ser apenas o local para ser gerado o arquivo alertando a dispon
 Exemplos:
  - C:\Users\user\Desktop\LIVRODISPONIVEL.TXT
  - C:\Users\user\Downloads\the_book_is_available.txt
+
+## Uso Externo
+ - Requests library (https://pypi.org/project/requests/)
+
+## Sources
+ - https://www.datacamp.com/tutorial/making-http-requests-in-python
+ - https://docs.python.org/3/library/configparser.html
+ - https://www.youtube.com/watch?v=N97q96BygUg
+ - https://www.youtube.com/watch?v=LUyM7Nm1i9k
