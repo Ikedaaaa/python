@@ -68,6 +68,7 @@ def logResponseData(p_response_data):
     #*********** SHIPPING DETAILS ***********
     if not StillSameOccurrence(shipping_details[0].codigo):
         WriteLastOccurrenceDetails(shipping_details[0])
+        
         #for occurrence in shipping_details:
     else:
         logging.info(f"No updates on the shipping details. Last Occurrence: {shipping_details[0].ocorrencia}; Date: {shipping_details[0].data_ocorrencia}")
@@ -80,7 +81,7 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
-url_param, codigo, cpf_cnpj, g_recaptcha_response = getCfgFileParams(r'requestparams.cfg', 'REQUEST', ['codigo', 'cpf_cnpj', 'g-recaptcha-response'])
+url_param, codigo, cpf_cnpj, g_recaptcha_response = getCfgFileParams(r'requestparams.cfg', 'REQUEST', ['url_param', 'codigo', 'cpf_cnpj', 'g-recaptcha-response'])
 
 payload = {'codigo':codigo, 'cpf_cnpj':cpf_cnpj, 'g-recaptcha-response':g_recaptcha_response}
 
