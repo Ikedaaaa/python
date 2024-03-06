@@ -1,0 +1,3 @@
+trackmypackage.log
+*.cfg
+!*_sample.cfg
