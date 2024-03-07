@@ -1,3 +1,4 @@
 trackmypackage.log
 *.cfg
 !*_sample.cfg
+lastoccurrencedetails.txt
