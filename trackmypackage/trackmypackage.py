@@ -10,7 +10,7 @@ def getRequestExceptionString(url, data):
 def formatDetailOccurrenceInfo(p_last_shipping_details):
     occurrence = p_last_shipping_details['ocorrencia']
     date = p_last_shipping_details['data_ocorrencia']
-    return f"Last Occurrence: {occurrence}; Date: {date}"
+    return f"Last Occurrence: {occurrence}; Date: {date}\n"
 
 def getCfgFileParams(file_name, section, cfg_params):
     cfg_values = []
@@ -98,7 +98,7 @@ def buildDeliveryTimeline(shipping_details):
         if occurrence['nome_recebedor'] is not None:
             timeline += f"""
             <p><b>Name</b>: {occurrence['nome_recebedor']}</p>
-            <p><b>Document</b>: {occurrence['recebedor_documento']}</p>
+            <p><b>Document</b>: {occurrence['documento_recebedor']}</p>
             <p><b>Relationship</b>: {occurrence['grau_relacionamento']}</p>
             """
 
