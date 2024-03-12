@@ -1,2 +1,5 @@
 password.hash
 encryptedfiles.ctrl
+fileencryption.spec
+dist/
+build/
