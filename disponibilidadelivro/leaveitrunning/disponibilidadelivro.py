@@ -3,6 +3,7 @@ import logging
 import smtplib
 from email.message import EmailMessage
 import requests
+from datetime import date
 
 def getRequestExceptionString(url, data):
     return f"An exception occurred during request to URL:\n{url}\nWith request data:\n{data}\n"
@@ -126,8 +127,12 @@ new_data = {
     "payment_method": "creditCard"
 }
 
+today = date.today()
+
+log_filename = f"disponibilidadelivro_{today.year}{today.month:02d}.log"
+
 logging.basicConfig(
-    filename='disponibilidadelivro.log',
+    filename=log_filename,
     filemode='a',
     format='[%(levelname)s] %(asctime)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
