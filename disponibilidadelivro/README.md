@@ -73,3 +73,4 @@ Exemplos:
  - https://www.youtube.com/watch?v=N97q96BygUg
  - https://www.youtube.com/watch?v=LUyM7Nm1i9k
  - https://www.geeksforgeeks.org/python-schedule-library/
+ - https://docs.python.org/3/library/datetime.html#date-objects

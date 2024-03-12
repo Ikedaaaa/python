@@ -3,6 +3,7 @@ import logging
 import smtplib
 from email.message import EmailMessage
 import requests
+from datetime import date
 import schedule
 import time
 
@@ -155,8 +156,12 @@ def makeHttpRequests():
     except Exception as e:
         logging.exception(getRequestExceptionString(url_criptowars, new_data))
 
+today = date.today()
+
+log_filename = f"disponibilidadelivro_{today.year}{today.month:02d}.log"
+
 logging.basicConfig(
-    filename='disponibilidadelivro.log',
+    filename=log_filename,
     filemode='a',
     format='[%(levelname)s] %(asctime)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
