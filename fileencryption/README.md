@@ -45,7 +45,8 @@ Pois assim, não serão identificados os arquivos que podem possuir dados sensí
 
 ## 2. Criptografar/Descriptografar algum arquivo
 Inputs:
- - O caminho do arquivo, com ele incluso (e.g.: C:\Users\<user>\Desktop\test.txt);
+ - O caminho do arquivo, com ele incluso (e.g.: C:/Users/<user>/Desktop/test.txt);
+  - Caso queira inserir vários arquivos, basta digitar "1" quando a mensagem de múltiplos arquivos for apresentada, então, inserir em cada linha o arquivo no formato acima;
  - A senha (usando getpass).
 
 Se não tiver descriptografado, criptografa e vice-versa;
