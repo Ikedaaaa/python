@@ -85,26 +85,27 @@ def encrypt(filepath, cryptographyObject):
     setQtnEncryptedFiles(getQtnEncryptedFiles() + 1)
     logging.info(f"File {filepath} ENCRYPTED\n")
 
-def decrypt(filepath, pwd, openAfterDecryption=False):
+def decrypt(files, pwd, openAfterDecryption=False):
     triedToOpenNotEncryptedFile = False
     if checkPassword(pwd):
         key = generateKey(pwd)
         cryptographyObject = Fernet(key)
-        try:
-            decrypted_data = cryptographyObject.decrypt(getFileContent(filepath))
-            setFileContent(filepath, decrypted_data)
-            qtnEncryptedFiles = getQtnEncryptedFiles()
-            setQtnEncryptedFiles(((qtnEncryptedFiles - 1) if qtnEncryptedFiles > 1 else 0))
-            logging.info(f"File {filepath} DECRYPTED\n")
-        except:
-            if not openAfterDecryption:
-                encrypt(filepath, cryptographyObject)
-            else:
-                triedToOpenNotEncryptedFile = True
-                logging.error("TO USE THIS OPTION, THE FILE NEEDS TO BE ENCRYPTED\n")
-        finally:
-            if openAfterDecryption and not triedToOpenNotEncryptedFile:
-                openFileAfterDecryption(filepath, cryptographyObject)
+        for filepath in files:
+            try:
+                decrypted_data = cryptographyObject.decrypt(getFileContent(filepath))
+                setFileContent(filepath, decrypted_data)
+                qtnEncryptedFiles = getQtnEncryptedFiles()
+                setQtnEncryptedFiles(((qtnEncryptedFiles - 1) if qtnEncryptedFiles > 1 else 0))
+                logging.info(f"File {filepath} DECRYPTED\n")
+            except:
+                if not openAfterDecryption:
+                    encrypt(filepath, cryptographyObject)
+                else:
+                    triedToOpenNotEncryptedFile = True
+                    logging.error("TO USE THIS OPTION, THE FILE NEEDS TO BE ENCRYPTED\n")
+            finally:
+                if openAfterDecryption and not triedToOpenNotEncryptedFile:
+                    openFileAfterDecryption(filepath, cryptographyObject)
     else:
         logging.error("WRONG PASSWORD\n")
 
@@ -158,16 +159,38 @@ def openFileAfterDecryption(file_path, cryptography_object):
         encrypt(file_path, cryptography_object)
 
 def onSelectEncryptionOption(open_after_decryption=False):
-    input_msg = "Type the full path of the file to be "+ ("" if open_after_decryption else "encrypted/") +"decrypted (file included): "
-    file = input(input_msg)
+    files = []
+    input_multiple_files = False
+
+    if not open_after_decryption:
+        input_multiple_files = int(input("\nType \"1\" if you wish to Encrypt/Decrypt multiple files. Type any other number for single file: ")) == 1
+
+    print("\nType the full path of the file"+("s" if input_multiple_files else "")+" to be "+ ("" if open_after_decryption else "encrypted/") +"decrypted (file included)")
+
+    if input_multiple_files:
+        i = 1
+        print("Type \"0\" to stop inputting files\n")
+        file_path_input = input(f"File {i}: ")
+        
+        while file_path_input != "0":
+            files.append(file_path_input)
+            i += 1
+            file_path_input = input(f"File {i}: ")
+    else:
+        files.append(input("\nFile path: "))
+
     pwd = getpass.getpass("Type your password: ")
-    decrypt(file, pwd, open_after_decryption)
+
+    if len(files) > 0:
+        decrypt(files, pwd, open_after_decryption)
+    else:
+        logging.error("No file was inputted!\n")
 
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
 
 print("\nChoose an option:")
 print("1. Set/Reset a password for cryptography;")
-print("2. Encrypt/Decrypt file;")
+print("2. Encrypt/Decrypt file(s) (allows input of multiple files);")
 print("3. Decrypt file and open it. When you close it, encrypt it again;")
 print("0. End program.\n")
 
