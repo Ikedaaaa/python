@@ -165,18 +165,30 @@ def onSelectEncryptionOption(open_after_decryption=False):
     if not open_after_decryption:
         input_multiple_files = int(input("\nType \"1\" if you wish to Encrypt/Decrypt multiple files. Type any other number for single file: ")) == 1
 
-    print("\nType the full path of the file"+("s" if input_multiple_files else "")+" to be "+ ("" if open_after_decryption else "encrypted/") +"decrypted (file included)")
-
     if input_multiple_files:
-        i = 1
-        print("Type \"0\" to stop inputting files\n")
-        file_path_input = input(f"File {i}: ")
-        
-        while file_path_input != "0":
-            files.append(file_path_input)
-            i += 1
+        input_files_using_file = int(input("\nType \"1\" if you have the files to be encrypted in a txt file. Type any other number to enter the files manually: ")) == 1
+
+        if input_files_using_file:
+            names_file_path = input("\nEnter the path of the file and the file containing the files to be encrypted/decrypted (e.g.: C:/Users/names.txt): ")
+
+            with open(names_file_path, "r") as names_file:
+                file = names_file.readline().rstrip()
+                while file != "":
+                    files.append(file)
+                    file = names_file.readline().rstrip()
+        else:
+            print("\nType the full path of the files to be encrypted/decrypted (file included)")
+
+            i = 1
+            print("Type \"0\" to stop inputting files\n")
             file_path_input = input(f"File {i}: ")
+            
+            while file_path_input != "0":
+                files.append(file_path_input)
+                i += 1
+                file_path_input = input(f"File {i}: ")
     else:
+        print("\nType the full path of the file to be "+ ("" if open_after_decryption else "encrypted/") +"decrypted (file included)")
         files.append(input("\nFile path: "))
 
     pwd = getpass.getpass("Type your password: ")
