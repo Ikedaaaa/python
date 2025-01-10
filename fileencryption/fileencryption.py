@@ -219,3 +219,5 @@ elif opcao == 3:
     onSelectEncryptionOption(True)
 
 print("\n*************** End of program ***************")
+
+input("\nPress Enter to end this program")
