@@ -1,5 +1,6 @@
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
 import base64
 import getpass
@@ -60,13 +61,20 @@ def generateSalt(work_factor):
     return bcrypt.gensalt(rounds=work_factor)
     
 def deriveKey(password):
-    #It would also be possible to use Bcrypt's kdf
-    #key = bcrypt.kdf(password=password.encode(), salt=salt, desired_key_bytes=32, rounds=1000)
-    kdf = Scrypt(salt=b'', length=32, n=2**21, r=8, p=1)
+    salt = Scrypt(salt=b'', length=16, n=2**19, r=8, p=1).derive(password.encode())
+    kdf = Argon2id(
+        salt=salt,
+        length=32,
+        iterations=12,
+        lanes=4,
+        memory_cost=2**21,
+        ad=None,
+        secret=None,
+    )
     return kdf.derive(password.encode())
 
 def generateKey(password):
-    #generate key from salt (not used anymore) and password and encode it using Base 64
+    #generate key from salt and password and encode it using Base 64
     logging.info("Deriving Criptography key from password\n")
     derived_key = deriveKey(password)
     return base64.urlsafe_b64encode(derived_key)
