@@ -3,3 +3,5 @@ encryptedfiles.ctrl
 fileencryption.spec
 dist/
 build/
+*.cfg
+!*_sample.cfg

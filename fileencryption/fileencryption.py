@@ -7,6 +7,7 @@ import getpass
 import bcrypt
 import logging
 import subprocess
+import configparser
 
 def getPassword():
     with open("password.hash", "rb") as pwdFile:
@@ -139,11 +140,30 @@ def getFileExtension(file_name):
     return file_name.split(".")[-1].lower()
 
 def getProcessToRun(file_path):
+    config_parser = configparser.RawConfigParser()
+    config_parser.read(r'programs-to-open-files.cfg')
+
+    notepad_path = config_parser.get('PROGRAMS', 'txt')
+    if len(notepad_path) == 0:
+        notepad_path = 'notepad.exe'
+    
+    pdf_path = config_parser.get('PROGRAMS', 'pdf')
+    if len(pdf_path) == 0:
+        pdf_path = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+
+    word_path = config_parser.get('PROGRAMS', 'docx')
+    if len(word_path) == 0:
+        word_path = 'C:/Program Files/Microsoft Office/root/Office16/winword.exe'
+
+    excel_path = config_parser.get('PROGRAMS', 'excel')
+    if len(excel_path) == 0:
+        excel_path = 'C:/Program Files/Microsoft Office/root/Office16/excel.exe'
+    
     processes_list = [
-        [['txt'], 'notepad.exe'], 
-        [['pdf'], 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'],
-        [['docx', 'doc'], 'C:\Program Files\Microsoft Office\\root\Office16\winword.exe'],
-        [['xlsx', 'xls', 'csv'], 'C:\Program Files\Microsoft Office\\root\Office16\excel.exe']
+        [['txt'], notepad_path], 
+        [['pdf'], pdf_path],
+        [['docx', 'doc'], word_path],
+        [['xlsx', 'xls', 'csv'], excel_path]
     ]
     file_extension = getFileExtension(file_path)
     for process in processes_list:
