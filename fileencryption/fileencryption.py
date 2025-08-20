@@ -142,21 +142,27 @@ def getFileExtension(file_name):
 def getProcessToRun(file_path):
     config_parser = configparser.RawConfigParser()
     config_parser.read(r'programs-to-open-files.cfg')
-
-    notepad_path = config_parser.get('PROGRAMS', 'txt')
-    if len(notepad_path) == 0:
-        notepad_path = 'notepad.exe'
     
-    pdf_path = config_parser.get('PROGRAMS', 'pdf')
-    if len(pdf_path) == 0:
+    if config_parser.has_section('PROGRAMS'):
+        notepad_path = config_parser.get('PROGRAMS', 'txt')
+        if len(notepad_path) == 0:
+            notepad_path = 'notepad.exe'
+        
+        pdf_path = config_parser.get('PROGRAMS', 'pdf')
+        if len(pdf_path) == 0:
+            pdf_path = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+
+        word_path = config_parser.get('PROGRAMS', 'docx')
+        if len(word_path) == 0:
+            word_path = 'C:/Program Files/Microsoft Office/root/Office16/winword.exe'
+
+        excel_path = config_parser.get('PROGRAMS', 'excel')
+        if len(excel_path) == 0:
+            excel_path = 'C:/Program Files/Microsoft Office/root/Office16/excel.exe'
+    else:
+        notepad_path = 'notepad.exe'
         pdf_path = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
-
-    word_path = config_parser.get('PROGRAMS', 'docx')
-    if len(word_path) == 0:
         word_path = 'C:/Program Files/Microsoft Office/root/Office16/winword.exe'
-
-    excel_path = config_parser.get('PROGRAMS', 'excel')
-    if len(excel_path) == 0:
         excel_path = 'C:/Program Files/Microsoft Office/root/Office16/excel.exe'
     
     processes_list = [
