@@ -2,12 +2,15 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
+from tkinter import filedialog
+
 import base64
 import getpass
 import bcrypt
 import logging
 import subprocess
 import configparser
+import tkinter
 
 def getPassword():
     with open("password.hash", "rb") as pwdFile:
@@ -25,7 +28,7 @@ def setPassword():
     workFactor = int(input("Salt work factor (0 to use the standard = 12): "))
     salt = generateSalt((workFactor if workFactor > 0 else 12))
 
-    logging.info(f"Generating new Bcrypt hash with Work Factor of {workFactor}\n")
+    logging.info(f"Generating new Bcrypt hash with Work Factor of {(workFactor if workFactor > 0 else 12)}\n")
     with open("password.hash", "wb") as pwdFile:
         pwdFile.write(bcrypt.hashpw(senha1.encode(), salt))
 
@@ -142,7 +145,7 @@ def getFileExtension(file_name):
 def getProcessToRun(file_path):
     config_parser = configparser.RawConfigParser()
     config_parser.read(r'programs-to-open-files.cfg')
-    
+
     if config_parser.has_section('PROGRAMS'):
         notepad_path = config_parser.get('PROGRAMS', 'txt')
         if len(notepad_path) == 0:
@@ -192,38 +195,53 @@ def openFileAfterDecryption(file_path, cryptography_object):
     finally:
         encrypt(file_path, cryptography_object)
 
-def onSelectEncryptionOption(open_after_decryption=False):
+def onSelectEncryptionOption(option, open_after_decryption=False):
     files = []
     input_multiple_files = False
+    option_word = ("ENCRYPTED" if option == 2 else "DECRYPTED")
 
-    if not open_after_decryption:
-        input_multiple_files = int(input("\nType \"1\" if you wish to Encrypt/Decrypt multiple files. Type any other number for single file: ")) == 1
+    get_files_using_file_picker = int(input(f"\nType \"1\" to select the file(s) to be {option_word} using the file picker.\nType any other number to input the file(s) path(s) manually: ")) == 1
 
-    if input_multiple_files:
-        input_files_using_file = int(input("\nType \"1\" if you have the files to be encrypted in a txt file. Type any other number to enter the files manually: ")) == 1
+    if not get_files_using_file_picker:
+        input_str_mf = f"\nType \"1\" if you wish to {option_word[:7]} multiple files. Type any other number for single file: "
+        input_str_uf = f"\nType \"1\" if you have the files to be {option_word} in a txt file. Type any other number to enter the files manually: "
+        input_str_ef = f"\nEnter the path of the file and the file containing the files to be {option_word} (e.g.: C:/Users/names.txt): "
 
-        if input_files_using_file:
-            names_file_path = input("\nEnter the path of the file and the file containing the files to be encrypted/decrypted (e.g.: C:/Users/names.txt): ")
+        if not open_after_decryption:
+            input_multiple_files = int(input(input_str_mf)) == 1
 
-            with open(names_file_path, "r") as names_file:
-                file = names_file.readline().rstrip()
-                while file != "":
-                    files.append(file)
+        input_str_tf = f"\nType the full path of the file{('s' if input_multiple_files else '')} to be {option_word} (file included)"
+
+        if input_multiple_files:
+            input_files_using_file = int(input(input_str_uf)) == 1
+
+            if input_files_using_file:
+                names_file_path = input(input_str_ef)
+
+                with open(names_file_path, "r") as names_file:
                     file = names_file.readline().rstrip()
-        else:
-            print("\nType the full path of the files to be encrypted/decrypted (file included)")
+                    while file != "":
+                        files.append(file)
+                        file = names_file.readline().rstrip()
+            else:
+                print(input_str_tf)
 
-            i = 1
-            print("Type \"0\" to stop inputting files\n")
-            file_path_input = input(f"File {i}: ")
-            
-            while file_path_input != "0":
-                files.append(file_path_input)
-                i += 1
+                i = 1
+                print("Type \"0\" to stop inputting files\n")
                 file_path_input = input(f"File {i}: ")
+                
+                while file_path_input != "0":
+                    files.append(file_path_input)
+                    i += 1
+                    file_path_input = input(f"File {i}: ")
+        else:
+            print(input_str_tf)
+            files.append(input("\nFile path: "))
     else:
-        print("\nType the full path of the file to be "+ ("" if open_after_decryption else "encrypted/") +"decrypted (file included)")
-        files.append(input("\nFile path: "))
+        if open_after_decryption:
+            files.append(filedialog.askopenfilename())
+        else:
+            files = list(filedialog.askopenfilenames())
 
     pwd = getpass.getpass("Type your password: ")
 
@@ -233,24 +251,28 @@ def onSelectEncryptionOption(open_after_decryption=False):
         logging.error("No file was inputted!\n")
 
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
+tkinter.Tk().withdraw()
 
 print("\nChoose an option:")
 print("1. Set/Reset a password for cryptography;")
-print("2. Encrypt/Decrypt file(s) (allows input of multiple files);")
-print("3. Decrypt file and open it. When you close it, encrypt it again;")
+print("2. Encrypt file(s) (allows input of multiple files);")
+print("3. Decrypt file(s) (allows input of multiple files);")
+print("4. Decrypt file and open it. When you close it, encrypt it again;")
 print("0. End program.\n")
 
 opcao = int(input("Option: "))
-while opcao not in [0, 1, 2, 3]:
+while opcao not in [0, 1, 2, 3, 4]:
     logging.warning("INVALID OPTION!")
     opcao = int(input("Option: "))
 
 if opcao == 1:
     resetPassword()
 elif opcao == 2:
-    onSelectEncryptionOption()
+    onSelectEncryptionOption(opcao)
 elif opcao == 3:
-    onSelectEncryptionOption(True)
+    onSelectEncryptionOption(opcao)
+elif opcao == 4:
+    onSelectEncryptionOption(opcao, True)
 
 print("\n*************** End of program ***************")
 
