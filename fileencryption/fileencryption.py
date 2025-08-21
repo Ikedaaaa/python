@@ -91,33 +91,43 @@ def setFileContent(filename, data):
     with open(filename, "wb") as writefile:
         writefile.write(data)
 
-def encrypt(filepath, cryptographyObject):
-    encrypted_data = cryptographyObject.encrypt(getFileContent(filepath))
-    setFileContent(filepath, encrypted_data)
-    setQtnEncryptedFiles(getQtnEncryptedFiles() + 1)
-    logging.info(f"File {filepath} ENCRYPTED\n")
 
-def decrypt(files, pwd, openAfterDecryption=False):
-    triedToOpenNotEncryptedFile = False
-    if checkPassword(pwd):
+def encrypt(pwd, files, cryptographyObject=None):
+    if not cryptographyObject:
         key = generateKey(pwd)
         cryptographyObject = Fernet(key)
-        for filepath in files:
-            try:
-                decrypted_data = cryptographyObject.decrypt(getFileContent(filepath))
-                setFileContent(filepath, decrypted_data)
-                qtnEncryptedFiles = getQtnEncryptedFiles()
-                setQtnEncryptedFiles(((qtnEncryptedFiles - 1) if qtnEncryptedFiles > 1 else 0))
-                logging.info(f"File {filepath} DECRYPTED\n")
-            except:
-                if not openAfterDecryption:
-                    encrypt(filepath, cryptographyObject)
-                else:
-                    triedToOpenNotEncryptedFile = True
-                    logging.error("TO USE THIS OPTION, THE FILE NEEDS TO BE ENCRYPTED\n")
-            finally:
-                if openAfterDecryption and not triedToOpenNotEncryptedFile:
-                    openFileAfterDecryption(filepath, cryptographyObject)
+    
+    for filepath in files:
+        try:
+            encrypted_data = cryptographyObject.encrypt(getFileContent(filepath))
+            setFileContent(filepath, encrypted_data)
+            setQtnEncryptedFiles(getQtnEncryptedFiles() + 1)
+            logging.info(f"File {filepath} ENCRYPTED\n")
+        except Exception as e:
+            raise e
+
+def decrypt(pwd, files, option):
+    key = generateKey(pwd)
+    cryptographyObject = Fernet(key)
+    for filepath in files:
+        try:
+            decrypted_data = cryptographyObject.decrypt(getFileContent(filepath))
+            setFileContent(filepath, decrypted_data)
+            qtnEncryptedFiles = getQtnEncryptedFiles()
+            setQtnEncryptedFiles(((qtnEncryptedFiles - 1) if qtnEncryptedFiles > 1 else 0))
+            logging.info(f"File {filepath} DECRYPTED\n")
+            if option == 4:
+                openFileAfterDecryption(filepath, cryptographyObject)
+        except:
+            logging.error("TO USE THIS OPTION, THE FILE NEEDS TO BE ENCRYPTED\n")
+
+def encrypt_decrypt(files, pwd, selected_option):
+    triedToOpenNotEncryptedFile = False
+    if checkPassword(pwd):
+        if selected_option == 2:
+            encrypt(pwd, files)
+        else:
+            decrypt(pwd, files, selected_option)
     else:
         logging.error("WRONG PASSWORD\n")
 
@@ -193,7 +203,7 @@ def openFileAfterDecryption(file_path, cryptography_object):
         else:
             logging.error(f"{process}: {fileExtension}\n")
     finally:
-        encrypt(file_path, cryptography_object)
+        encrypt('', [file_path], cryptography_object)
 
 def onSelectEncryptionOption(option, open_after_decryption=False):
     files = []
@@ -246,7 +256,7 @@ def onSelectEncryptionOption(option, open_after_decryption=False):
     pwd = getpass.getpass("Type your password: ")
 
     if len(files) > 0:
-        decrypt(files, pwd, open_after_decryption)
+        encrypt_decrypt(files, pwd, option)
     else:
         logging.error("No file was inputted!\n")
 
@@ -267,12 +277,8 @@ while opcao not in [0, 1, 2, 3, 4]:
 
 if opcao == 1:
     resetPassword()
-elif opcao == 2:
+elif opcao in [2, 3, 4]:
     onSelectEncryptionOption(opcao)
-elif opcao == 3:
-    onSelectEncryptionOption(opcao)
-elif opcao == 4:
-    onSelectEncryptionOption(opcao, True)
 
 print("\n*************** End of program ***************")
 
