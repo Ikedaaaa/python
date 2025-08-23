@@ -296,7 +296,7 @@ def openFileAfterDecryption(file_path, pwd):
     finally:
         encrypt(pwd, [file_path])
 
-def onSelectEncryptionOption(option, open_after_decryption=False):
+def onSelectEncryptionOption(option):
     files = []
     input_multiple_files = False
     option_word = ("ENCRYPTED" if option == 2 else "DECRYPTED")
@@ -308,7 +308,7 @@ def onSelectEncryptionOption(option, open_after_decryption=False):
         input_str_uf = f"\nType \"1\" if you have the files to be {option_word} in a txt file. Type any other number to enter the files manually: "
         input_str_ef = f"\nEnter the path of the file and the file containing the files to be {option_word} (e.g.: C:/Users/names.txt): "
 
-        if not open_after_decryption:
+        if option != 4:
             input_multiple_files = int(input(input_str_mf)) == 1
 
         input_str_tf = f"\nType the full path of the file{('s' if input_multiple_files else '')} to be {option_word} (file included)"
@@ -339,7 +339,7 @@ def onSelectEncryptionOption(option, open_after_decryption=False):
             print(input_str_tf)
             files.append(input("\nFile path: "))
     else:
-        if open_after_decryption:
+        if option == 4:
             files.append(filedialog.askopenfilename())
         else:
             files = list(filedialog.askopenfilenames())
