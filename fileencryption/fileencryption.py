@@ -12,8 +12,16 @@ import configparser
 import tkinter
 import secrets
 import hashlib
+import time
 
 tkinter.Tk().withdraw()
+config_parser = configparser.RawConfigParser()
+config_parser.read(r'config.cfg')
+
+if config_parser.has_section('TIME'):
+    time_ctrl = int(config_parser.get('TIME', 'time_ctrl')) > 0
+else:
+    time_ctrl = False
 
 def getPassword():
     with open("password.hash", "rb") as pwdFile:
@@ -82,7 +90,16 @@ def deriveKey(p_salt, password):
 def generateKey(p_salt, password):
     #generate key from salt and password and encode it using Base 64
     logging.info("Deriving Criptography key from password\n")
+    
+    if time_ctrl:
+        t1 = time.perf_counter_ns()
+    
     derived_key = deriveKey(p_salt, password)
+
+    if time_ctrl:
+        t2 = time.perf_counter_ns()
+        log_time_ctrl(t1, t2, "Derive key")
+    
     return base64.urlsafe_b64encode(derived_key)
 
 def get_file_header(filename):
@@ -189,7 +206,14 @@ def decrypt(pwd, files, option):
         openFileAfterDecryption(files[0], pwd)
 
 def encrypt_decrypt(files, pwd, selected_option):
+    if time_ctrl:
+        t1 = time.perf_counter_ns()
+    
     if checkPassword(pwd):
+        if time_ctrl:
+            t2 = time.perf_counter_ns()
+            log_time_ctrl(t1, t2, "Check password")
+        
         if selected_option == 2:
             encrypt(pwd, files)
         else:
@@ -215,13 +239,14 @@ def encryptedFilesStr(x):
 def changePwdWithEncryptedFilesInfo():
     logging.info(f"Decryption won't work if you change the password because the key used for encryption will not be the same")
 
+def log_time_ctrl(t1, t2, scope):
+    nanosecs = (t2 - t1)
+    logging.info(f"{scope}: {(nanosecs/1000000):.2f} milliseconds. {(nanosecs/1000000000):.4f} seconds")
+
 def getFileExtension(file_name):
     return file_name.split(".")[-1].lower()
 
 def getProcessToRun(file_path):
-    config_parser = configparser.RawConfigParser()
-    config_parser.read(r'programs-to-open-files.cfg')
-
     if config_parser.has_section('PROGRAMS'):
         notepad_path = config_parser.get('PROGRAMS', 'txt')
         if len(notepad_path) == 0:
@@ -321,6 +346,9 @@ def onSelectEncryptionOption(option, open_after_decryption=False):
 
     pwd = bytearray(getpass.getpass("Type your password: ").encode())
 
+    if time_ctrl:
+        t1 = time.perf_counter_ns()
+
     if len(files) > 0:
         encrypt_decrypt(files, bytes(pwd).decode(), option)
     else:
@@ -328,6 +356,10 @@ def onSelectEncryptionOption(option, open_after_decryption=False):
     
     clear_bytearray(pwd)
     del pwd
+
+    if time_ctrl:
+        t2 = time.perf_counter_ns()
+        log_time_ctrl(t1, t2, "Whole process")
 
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
 
