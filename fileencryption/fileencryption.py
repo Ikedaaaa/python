@@ -363,19 +363,20 @@ def onSelectEncryptionOption(option):
         
         set_focus()
 
-    pwd = bytearray(getpass.getpass("Type your password: ").encode())
+    try:
+        pwd = bytearray(getpass.getpass("Type your password: ").encode())
 
-    if time_ctrl:
-        t1 = time.perf_counter_ns()
+        if time_ctrl:
+            t1 = time.perf_counter_ns()
 
-    if len(files) > 0:
-        encrypt_decrypt(files, bytes(pwd).decode(), option)
-    else:
-        logging.error("No file was inputted!\n")
-    
-    clear_bytearray(pwd)
-    del pwd
-    gc.collect()
+        if len(files) > 0:
+            encrypt_decrypt(files, bytes(pwd).decode(), option)
+        else:
+            logging.error("No file was inputted!\n")
+    finally:    
+        clear_bytearray(pwd)
+        del pwd
+        gc.collect()
 
     if time_ctrl:
         t2 = time.perf_counter_ns()
