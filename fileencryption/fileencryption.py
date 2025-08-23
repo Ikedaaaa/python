@@ -14,6 +14,7 @@ import secrets
 import hashlib
 import time
 import ctypes
+import gc
 
 kernel32 = ctypes.windll.kernel32
 user32 = ctypes.windll.user32
@@ -144,6 +145,7 @@ def encrypt(pwd, files):
         try:
             if key:
                 clear_bytearray(key)
+                gc.collect()
             encrypted_data = cryptographyObject.encrypt(getFileContent(filepath))
             data_with_header = add_header_to_data(salt, encrypted_data)
             setFileContent(filepath, data_with_header)
@@ -214,6 +216,8 @@ def decrypt(pwd, files, option):
         clear_bytearray(k)
     
     salts_dict.clear()
+    del salts_dict
+    gc.collect()
 
     if file_decrypted and (option == 4):
         openFileAfterDecryption(files[0], pwd)
@@ -371,6 +375,7 @@ def onSelectEncryptionOption(option):
     
     clear_bytearray(pwd)
     del pwd
+    gc.collect()
 
     if time_ctrl:
         t2 = time.perf_counter_ns()
