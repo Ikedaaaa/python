@@ -1,5 +1,4 @@
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
 from tkinter import filedialog
@@ -11,6 +10,10 @@ import logging
 import subprocess
 import configparser
 import tkinter
+import secrets
+import hashlib
+
+tkinter.Tk().withdraw()
 
 def getPassword():
     with open("password.hash", "rb") as pwdFile:
@@ -64,12 +67,11 @@ def checkPassword(password_input, password_old_hash=""):
 def generateSalt(work_factor):
     return bcrypt.gensalt(rounds=work_factor)
     
-def deriveKey(password):
-    salt = Scrypt(salt=b'', length=16, n=2**19, r=8, p=1).derive(password.encode())
+def deriveKey(p_salt, password):
     kdf = Argon2id(
-        salt=salt,
+        salt=p_salt,
         length=32,
-        iterations=12,
+        iterations=10,
         lanes=4,
         memory_cost=2**21,
         ad=None,
@@ -77,11 +79,15 @@ def deriveKey(password):
     )
     return kdf.derive(password.encode())
 
-def generateKey(password):
+def generateKey(p_salt, password):
     #generate key from salt and password and encode it using Base 64
     logging.info("Deriving Criptography key from password\n")
-    derived_key = deriveKey(password)
+    derived_key = deriveKey(p_salt, password)
     return base64.urlsafe_b64encode(derived_key)
+
+def get_file_header(filename):
+    with open(filename, "rb") as readfile:
+        return readfile.read(108)
 
 def getFileContent(filename):
     with open(filename, "rb") as readfile:
@@ -91,38 +97,98 @@ def setFileContent(filename, data):
     with open(filename, "wb") as writefile:
         writefile.write(data)
 
+def add_header_to_data(p_salt, data):
+    b64_salt = base64.urlsafe_b64encode(p_salt)
+    salt_hash = hashlib.sha256(b64_salt).hexdigest().encode()
+    b64_hash = base64.urlsafe_b64encode(salt_hash)
+    return (b64_hash[:86] + b64_salt[:22] + data)
 
-def encrypt(pwd, files, cryptographyObject=None):
-    if not cryptographyObject:
-        key = generateKey(pwd)
-        cryptographyObject = Fernet(key)
-    
-    for filepath in files:
+def encrypt(pwd, files):
+    new_salt_each_file = (True if (len(files) <= 1) else (int(input(f"\nType \"1\" to generate a new salt and key for each file.\nType any other number to use the same: ")) == 1))
+
+    salt = secrets.token_bytes(16)
+    key = bytearray(generateKey(salt, pwd))
+    cryptographyObject = Fernet(bytes(key))
+
+    for idx, filepath in enumerate(files):
         try:
+            if key:
+                clear_bytearray(key)
             encrypted_data = cryptographyObject.encrypt(getFileContent(filepath))
-            setFileContent(filepath, encrypted_data)
+            data_with_header = add_header_to_data(salt, encrypted_data)
+            setFileContent(filepath, data_with_header)
             setQtnEncryptedFiles(getQtnEncryptedFiles() + 1)
             logging.info(f"File {filepath} ENCRYPTED\n")
+            
+            if (idx < (len(files) - 1)) and new_salt_each_file:
+                salt = secrets.token_bytes(16)
+                key = bytearray(generateKey(salt, pwd))
+                cryptographyObject = Fernet(bytes(key))
         except Exception as e:
             raise e
+        
+def get_salt_and_content_from_file(file):
+    header = get_file_header(file)
+    if len(header) != 108:
+        return (b'', b'')
+    
+    b64_hash = header[:86] + b'=='
+    b64_salt = header[86:] + b'=='
+
+    try:
+        hex_hash = base64.urlsafe_b64decode(b64_hash).decode()
+    except:
+        return (b'', b'')
+    salt_hash = hashlib.sha256(b64_salt).hexdigest()
+
+    if hex_hash != salt_hash:
+        return (b'', b'')
+    
+    all_data = getFileContent(file)
+    content = all_data[108:]
+
+    return (base64.urlsafe_b64decode(b64_salt), content)
+
+def clear_bytearray(bytearray_object):
+    for i in range(len(bytearray_object)):
+        bytearray_object[i] = 0
+
+    bytearray_object = None
 
 def decrypt(pwd, files, option):
-    key = generateKey(pwd)
-    cryptographyObject = Fernet(key)
+    salts_dict = {}
+    file_decrypted = False
     for filepath in files:
-        try:
-            decrypted_data = cryptographyObject.decrypt(getFileContent(filepath))
-            setFileContent(filepath, decrypted_data)
-            qtnEncryptedFiles = getQtnEncryptedFiles()
-            setQtnEncryptedFiles(((qtnEncryptedFiles - 1) if qtnEncryptedFiles > 1 else 0))
-            logging.info(f"File {filepath} DECRYPTED\n")
-            if option == 4:
-                openFileAfterDecryption(filepath, cryptographyObject)
-        except:
-            logging.error("TO USE THIS OPTION, THE FILE NEEDS TO BE ENCRYPTED\n")
+        salt, data = get_salt_and_content_from_file(filepath)
+        if len(salt) == 16:
+            key = bytearray(salts_dict.get(salt, b''))
+            
+            if not key:
+                key = bytearray(generateKey(salt, pwd))
+                salts_dict[salt] = key
+            
+            cryptographyObject = Fernet(bytes(key))
+            try:
+                decrypted_data = cryptographyObject.decrypt(data)
+                setFileContent(filepath, decrypted_data)
+                qtnEncryptedFiles = getQtnEncryptedFiles()
+                setQtnEncryptedFiles(((qtnEncryptedFiles - 1) if qtnEncryptedFiles > 1 else 0))
+                logging.info(f"File {filepath} DECRYPTED\n")
+                file_decrypted = True
+            except Exception as e:
+                raise e
+        else:
+            logging.error(f"FILE \"{filepath}\" NOT ENCRYPTED\n")
+    
+    for s, k in salts_dict.items():
+        clear_bytearray(k)
+    
+    salts_dict.clear()
+
+    if file_decrypted and (option == 4):
+        openFileAfterDecryption(files[0], pwd)
 
 def encrypt_decrypt(files, pwd, selected_option):
-    triedToOpenNotEncryptedFile = False
     if checkPassword(pwd):
         if selected_option == 2:
             encrypt(pwd, files)
@@ -190,7 +256,7 @@ def getProcessToRun(file_path):
             return True, file_extension, process[1]
     return False, file_extension, 'File extension not supported yet'
 
-def openFileAfterDecryption(file_path, cryptography_object):
+def openFileAfterDecryption(file_path, pwd):
     try:
         fileExtensionSupported, fileExtension, process = getProcessToRun(file_path)
         if fileExtensionSupported:
@@ -203,7 +269,7 @@ def openFileAfterDecryption(file_path, cryptography_object):
         else:
             logging.error(f"{process}: {fileExtension}\n")
     finally:
-        encrypt('', [file_path], cryptography_object)
+        encrypt(pwd, [file_path])
 
 def onSelectEncryptionOption(option, open_after_decryption=False):
     files = []
@@ -253,15 +319,17 @@ def onSelectEncryptionOption(option, open_after_decryption=False):
         else:
             files = list(filedialog.askopenfilenames())
 
-    pwd = getpass.getpass("Type your password: ")
+    pwd = bytearray(getpass.getpass("Type your password: ").encode())
 
     if len(files) > 0:
-        encrypt_decrypt(files, pwd, option)
+        encrypt_decrypt(files, bytes(pwd).decode(), option)
     else:
         logging.error("No file was inputted!\n")
+    
+    clear_bytearray(pwd)
+    del pwd
 
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
-tkinter.Tk().withdraw()
 
 print("\nChoose an option:")
 print("1. Set/Reset a password for cryptography;")
