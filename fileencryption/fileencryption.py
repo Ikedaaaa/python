@@ -23,10 +23,12 @@ hwnd = kernel32.GetConsoleWindow()
 config_parser = configparser.RawConfigParser()
 config_parser.read(r'config.cfg')
 
-if config_parser.has_section('TIME'):
-    time_ctrl = int(config_parser.get('TIME', 'time_ctrl')) > 0
+if config_parser.has_section('GENERAL'):
+    time_ctrl = int(config_parser.get('GENERAL', 'time_ctrl')) > 0
+    file_input_method = int(config_parser.get('GENERAL', 'file_input'))
 else:
     time_ctrl = False
+    file_input_method = 0
 
 def set_focus():
     time.sleep(0.1)
@@ -318,7 +320,10 @@ def onSelectEncryptionOption(option):
     input_multiple_files = False
     option_word = ("ENCRYPTED" if option == 2 else "DECRYPTED")
 
-    get_files_using_file_picker = int(input(f"\nType \"1\" to select the file(s) to be {option_word} using the file picker.\nType any other number to input the file(s) path(s) manually: ")) == 1
+    get_files_using_file_picker = (file_input_method == 2)
+
+    if (file_input_method not in [1, 2]):
+        get_files_using_file_picker = int(input(f"\nType \"1\" to select the file(s) to be {option_word} using the file picker.\nType any other number to input the file(s) path(s) manually: ")) == 1
 
     if not get_files_using_file_picker:
         input_str_mf = f"\nType \"1\" if you wish to {option_word[:7]} multiple files. Type any other number for single file: "
