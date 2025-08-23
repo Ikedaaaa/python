@@ -13,8 +13,12 @@ import tkinter
 import secrets
 import hashlib
 import time
+import ctypes
 
-tkinter.Tk().withdraw()
+kernel32 = ctypes.windll.kernel32
+user32 = ctypes.windll.user32
+hwnd = kernel32.GetConsoleWindow()
+
 config_parser = configparser.RawConfigParser()
 config_parser.read(r'config.cfg')
 
@@ -22,6 +26,15 @@ if config_parser.has_section('TIME'):
     time_ctrl = int(config_parser.get('TIME', 'time_ctrl')) > 0
 else:
     time_ctrl = False
+
+def set_focus():
+    time.sleep(0.1)
+    user32.SetForegroundWindow(hwnd)
+
+root = tkinter.Tk()
+root.withdraw()
+set_focus()
+root.destroy()
 
 def getPassword():
     with open("password.hash", "rb") as pwdFile:
@@ -343,6 +356,8 @@ def onSelectEncryptionOption(option):
             files.append(filedialog.askopenfilename())
         else:
             files = list(filedialog.askopenfilenames())
+        
+        set_focus()
 
     pwd = bytearray(getpass.getpass("Type your password: ").encode())
 
