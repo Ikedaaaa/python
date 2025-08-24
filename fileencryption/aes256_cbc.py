@@ -1,6 +1,6 @@
-import base64
 import binascii
 
+from base64 import urlsafe_b64encode, urlsafe_b64decode
 from secrets import token_bytes
 from time import time
 
@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 class AES256:
     def __init__(self, key: bytes):
         try:
-            key = base64.urlsafe_b64decode(key)
+            key = urlsafe_b64decode(key)
         except binascii.Error as exc:
             raise ValueError("Key must be 64 url-safe base64-encoded bytes.") from exc
         if len(key) != 64:
@@ -45,7 +45,7 @@ class AES256:
         h.update(token)
         tag = h.finalize()
 
-        return base64.urlsafe_b64encode(token + tag)
+        return urlsafe_b64encode(token + tag)
     
     def decrypt(self, token: bytes, ttl: int | None = None) -> bytes:
         timestamp, decoded = AES256.get_token_data(token)
@@ -84,7 +84,7 @@ class AES256:
             raise TypeError("token must be bytes or str")
         
         try:
-            data = base64.urlsafe_b64decode(token)
+            data = urlsafe_b64decode(token)
         except (TypeError, binascii.Error):
             raise InvalidToken
         

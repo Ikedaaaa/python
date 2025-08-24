@@ -1,26 +1,29 @@
 from aes256_cbc import AES256
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
-from tkinter import filedialog
+from tkinter import filedialog, Tk
+from configparser import RawConfigParser
 
-import base64
-import getpass
-import bcrypt
+from base64 import urlsafe_b64encode, urlsafe_b64decode
+from getpass import getpass
+from bcrypt import hashpw, checkpw, gensalt
+from subprocess import run
+from secrets import token_bytes
+from hashlib import sha256
+from time import sleep, perf_counter_ns
+from gc import collect
+from os.path import dirname
+from os import fdopen, fsync, replace, remove
+from tempfile import mkstemp
+
 import logging
-import subprocess
-import configparser
-import tkinter
-import secrets
-import hashlib
-import time
 import ctypes
-import gc
 
 kernel32 = ctypes.windll.kernel32
 user32 = ctypes.windll.user32
 hwnd = kernel32.GetConsoleWindow()
 
-config_parser = configparser.RawConfigParser()
+config_parser = RawConfigParser()
 config_parser.read(r'config.cfg')
 
 if config_parser.has_section('GENERAL'):
@@ -31,10 +34,10 @@ else:
     file_input_method = 0
 
 def set_focus():
-    time.sleep(0.1)
+    sleep(0.1)
     user32.SetForegroundWindow(hwnd)
 
-root = tkinter.Tk()
+root = Tk()
 root.withdraw()
 set_focus()
 root.destroy()
@@ -44,20 +47,20 @@ def getPassword():
         return pwdFile.read()
 
 def setPassword():
-    senha1 = getpass.getpass("\nType your new password: ")
-    senha2 = getpass.getpass("Confirm your new password: ")
+    senha1 = getpass("\nType your new password: ")
+    senha2 = getpass("Confirm your new password: ")
 
     while senha1 != senha2:
         logging.warning("THE PASSWORDS DON'T MATCH\n")
-        senha1 = getpass.getpass("Type your new password: ")
-        senha2 = getpass.getpass("Confirm your new password: ")
+        senha1 = getpass("Type your new password: ")
+        senha2 = getpass("Confirm your new password: ")
 
     workFactor = int(input("Salt work factor (0 to use the standard = 12): "))
     salt = generateSalt((workFactor if workFactor > 0 else 12))
 
     logging.info(f"Generating new Bcrypt hash with Work Factor of {(workFactor if workFactor > 0 else 12)}\n")
     with open("password.hash", "wb") as pwdFile:
-        pwdFile.write(bcrypt.hashpw(senha1.encode(), salt))
+        pwdFile.write(hashpw(senha1.encode(), salt))
 
     logging.info("New password set successfully\n")
 
@@ -67,7 +70,7 @@ def resetPassword():
         password_hash = getPassword()
 
         if qtnEncryptedFiles <= 0:
-            password_old = getpass.getpass("\nType your old password: ")
+            password_old = getpass("\nType your old password: ")
 
             if checkPassword(password_old, password_hash):
                 print("****** Reset password ******")
@@ -86,10 +89,10 @@ def resetPassword():
 def checkPassword(password_input, password_old_hash=""):
     logging.info(f"Checking Password\n")
     password_hash = getPassword() if password_old_hash == "" else password_old_hash
-    return bcrypt.checkpw(bytes(password_input), password_hash)
+    return checkpw(bytes(password_input), password_hash)
 
 def generateSalt(work_factor):
-    return bcrypt.gensalt(rounds=work_factor)
+    return gensalt(rounds=work_factor)
     
 def deriveKey(p_salt, password):
     kdf = Argon2id(
@@ -108,15 +111,15 @@ def generateKey(p_salt, password):
     logging.info("Deriving Criptography key from password\n")
     
     if time_ctrl:
-        t1 = time.perf_counter_ns()
+        t1 = perf_counter_ns()
     
     derived_key = deriveKey(p_salt, password)
 
     if time_ctrl:
-        t2 = time.perf_counter_ns()
+        t2 = perf_counter_ns()
         log_time_ctrl(t1, t2, "Derive key")
     
-    return base64.urlsafe_b64encode(derived_key)
+    return urlsafe_b64encode(derived_key)
 
 def get_file_header(filename):
     with open(filename, "rb") as readfile:
@@ -126,21 +129,34 @@ def getFileContent(filename):
     with open(filename, "rb") as readfile:
         return readfile.read()
 
-def setFileContent(filename, data):
-    with open(filename, "wb") as writefile:
-        writefile.write(data)
+def setFileContent(src_file, data):
+    dir_name = dirname(src_file) or "."
+    fd, tmp_path = mkstemp(dir=dir_name)
+    try:
+        with fdopen(fd, "wb") as tmp_file:
+            tmp_file.write(data)
+            tmp_file.flush()
+            fsync(tmp_file.fileno())  # ensure data is on disk
+        
+        replace(tmp_path, src_file)
+    except Exception:
+        try:
+            remove(tmp_path)
+        except OSError:
+            pass
+        raise
 
 def add_header_to_data(p_salt, data):
-    b64_salt = base64.urlsafe_b64encode(p_salt)
-    salt_hash = hashlib.sha256(b64_salt).hexdigest().encode()
-    b64_hash = base64.urlsafe_b64encode(salt_hash)
+    b64_salt = urlsafe_b64encode(p_salt)
+    salt_hash = sha256(b64_salt).hexdigest().encode()
+    b64_hash = urlsafe_b64encode(salt_hash)
     return (b64_hash[:86] + b64_salt[:22] + data)
 
 def encrypt(pwd, files):
     input_text = f"\nType \"1\" to generate a new salt and key for each file.\nType any other number to use the same: "
     new_salt_each_file = (True if (len(files) <= 1) else (int(input(input_text)) == 1))
 
-    salt = secrets.token_bytes(16)
+    salt = token_bytes(16)
     key = bytearray(generateKey(salt, pwd))
     try:
         aes256 = AES256(bytes(key))
@@ -149,7 +165,7 @@ def encrypt(pwd, files):
                 if key:
                     clear_bytearray(key)
                     key = None
-                    gc.collect()
+                    collect()
                 encrypted_data = aes256.encrypt(getFileContent(filepath))
                 data_with_header = add_header_to_data(salt, encrypted_data)
                 setFileContent(filepath, data_with_header)
@@ -157,7 +173,7 @@ def encrypt(pwd, files):
                 logging.info(f"File {filepath} ENCRYPTED\n")
                 
                 if (idx < (len(files) - 1)) and new_salt_each_file:
-                    salt = secrets.token_bytes(16)
+                    salt = token_bytes(16)
                     key = bytearray(generateKey(salt, pwd))
                     aes256 = AES256(bytes(key))
             except Exception as e:
@@ -167,7 +183,7 @@ def encrypt(pwd, files):
             clear_bytearray(key)
         key = None
         del key
-        gc.collect()
+        collect()
         
 def get_salt_and_content_from_file(file):
     header = get_file_header(file)
@@ -178,10 +194,10 @@ def get_salt_and_content_from_file(file):
     b64_salt = header[86:] + b'=='
 
     try:
-        hex_hash = base64.urlsafe_b64decode(b64_hash).decode()
+        hex_hash = urlsafe_b64decode(b64_hash).decode()
     except:
         return (b'', b'')
-    salt_hash = hashlib.sha256(b64_salt).hexdigest()
+    salt_hash = sha256(b64_salt).hexdigest()
 
     if hex_hash != salt_hash:
         return (b'', b'')
@@ -189,7 +205,7 @@ def get_salt_and_content_from_file(file):
     all_data = getFileContent(file)
     content = all_data[108:]
 
-    return (base64.urlsafe_b64decode(b64_salt), content)
+    return (urlsafe_b64decode(b64_salt), content)
 
 def clear_bytearray(bytearray_object):
     for i in range(len(bytearray_object)):
@@ -230,18 +246,18 @@ def decrypt(pwd, files, option):
         salts_dict.clear()
         salts_dict = None
         del salts_dict
-        gc.collect()
+        collect()
 
     if file_decrypted and (option == 4):
         openFileAfterDecryption(files[0], pwd)
 
 def encrypt_decrypt(files, pwd, selected_option):
     if time_ctrl:
-        t1 = time.perf_counter_ns()
+        t1 = perf_counter_ns()
     
     if checkPassword(pwd):
         if time_ctrl:
-            t2 = time.perf_counter_ns()
+            t2 = perf_counter_ns()
             log_time_ctrl(t1, t2, "Check password")
         
         if selected_option == 2:
@@ -315,7 +331,7 @@ def openFileAfterDecryption(file_path, pwd):
     try:
         fileExtensionSupported, fileExtension, process = getProcessToRun(file_path)
         if fileExtensionSupported:
-            subprocess.run([process, file_path])
+            run([process, file_path])
             if fileExtension == 'pdf':
                 logging.warning("A pdf file doesn't wait for the process to be terminated before continuing the execution of the code.")
                 print("An input() was used to prevent the file from being encrypted immediately after trying to open it.")
@@ -380,10 +396,10 @@ def onSelectEncryptionOption(option):
         set_focus()
 
     try:
-        pwd = bytearray(getpass.getpass("Type your password: ").encode())
+        pwd = bytearray(getpass("Type your password: ").encode())
 
         if time_ctrl:
-            t1 = time.perf_counter_ns()
+            t1 = perf_counter_ns()
 
         if len(files) > 0:
             encrypt_decrypt(files, pwd, option)
@@ -393,10 +409,10 @@ def onSelectEncryptionOption(option):
         clear_bytearray(pwd)
         pwd = None
         del pwd
-        gc.collect()
+        collect()
 
     if time_ctrl:
-        t2 = time.perf_counter_ns()
+        t2 = perf_counter_ns()
         log_time_ctrl(t1, t2, "Whole process")
 
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
