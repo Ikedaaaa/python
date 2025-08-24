@@ -5,3 +5,4 @@ dist/
 build/
 *.cfg
 !*_sample.cfg
+__pycache__/

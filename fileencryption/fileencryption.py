@@ -1,4 +1,4 @@
-from cryptography.fernet import Fernet
+from aes256_cbc import AES256
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
 from tkinter import filedialog
@@ -94,7 +94,7 @@ def generateSalt(work_factor):
 def deriveKey(p_salt, password):
     kdf = Argon2id(
         salt=p_salt,
-        length=32,
+        length=64,
         iterations=10,
         lanes=4,
         memory_cost=2**21,
@@ -137,29 +137,35 @@ def add_header_to_data(p_salt, data):
     return (b64_hash[:86] + b64_salt[:22] + data)
 
 def encrypt(pwd, files):
-    new_salt_each_file = (True if (len(files) <= 1) else (int(input(f"\nType \"1\" to generate a new salt and key for each file.\nType any other number to use the same: ")) == 1))
+    input_text = f"\nType \"1\" to generate a new salt and key for each file.\nType any other number to use the same: "
+    new_salt_each_file = (True if (len(files) <= 1) else (int(input(input_text)) == 1))
 
     salt = secrets.token_bytes(16)
     key = bytearray(generateKey(salt, pwd))
-    cryptographyObject = Fernet(bytes(key))
-
-    for idx, filepath in enumerate(files):
-        try:
-            if key:
-                clear_bytearray(key)
-                gc.collect()
-            encrypted_data = cryptographyObject.encrypt(getFileContent(filepath))
-            data_with_header = add_header_to_data(salt, encrypted_data)
-            setFileContent(filepath, data_with_header)
-            setQtnEncryptedFiles(getQtnEncryptedFiles() + 1)
-            logging.info(f"File {filepath} ENCRYPTED\n")
-            
-            if (idx < (len(files) - 1)) and new_salt_each_file:
-                salt = secrets.token_bytes(16)
-                key = bytearray(generateKey(salt, pwd))
-                cryptographyObject = Fernet(bytes(key))
-        except Exception as e:
-            raise e
+    try:
+        aes256 = AES256(bytes(key))
+        for idx, filepath in enumerate(files):
+            try:
+                if key:
+                    clear_bytearray(key)
+                    gc.collect()
+                encrypted_data = aes256.encrypt(getFileContent(filepath))
+                data_with_header = add_header_to_data(salt, encrypted_data)
+                setFileContent(filepath, data_with_header)
+                setQtnEncryptedFiles(getQtnEncryptedFiles() + 1)
+                logging.info(f"File {filepath} ENCRYPTED\n")
+                
+                if (idx < (len(files) - 1)) and new_salt_each_file:
+                    salt = secrets.token_bytes(16)
+                    key = bytearray(generateKey(salt, pwd))
+                    aes256 = AES256(bytes(key))
+            except Exception as e:
+                raise e
+    finally:
+        if key:
+            clear_bytearray(key)
+        del key
+        gc.collect()
         
 def get_salt_and_content_from_file(file):
     header = get_file_header(file)
@@ -192,34 +198,37 @@ def clear_bytearray(bytearray_object):
 def decrypt(pwd, files, option):
     salts_dict = {}
     file_decrypted = False
-    for filepath in files:
-        salt, data = get_salt_and_content_from_file(filepath)
-        if len(salt) == 16:
-            key = bytearray(salts_dict.get(salt, b''))
-            
-            if not key:
-                key = bytearray(generateKey(salt, pwd))
-                salts_dict[salt] = key
-            
-            cryptographyObject = Fernet(bytes(key))
-            try:
-                decrypted_data = cryptographyObject.decrypt(data)
-                setFileContent(filepath, decrypted_data)
-                qtnEncryptedFiles = getQtnEncryptedFiles()
-                setQtnEncryptedFiles(((qtnEncryptedFiles - 1) if qtnEncryptedFiles > 1 else 0))
-                logging.info(f"File {filepath} DECRYPTED\n")
-                file_decrypted = True
-            except Exception as e:
-                raise e
-        else:
-            logging.error(f"FILE \"{filepath}\" NOT ENCRYPTED\n")
-    
-    for s, k in salts_dict.items():
-        clear_bytearray(k)
-    
-    salts_dict.clear()
-    del salts_dict
-    gc.collect()
+
+    try:
+        for filepath in files:
+            salt, data = get_salt_and_content_from_file(filepath)
+            if len(salt) == 16:
+                key = bytearray(salts_dict.get(salt, b''))
+                
+                if not key:
+                    key = bytearray(generateKey(salt, pwd))
+                    salts_dict[salt] = key
+                
+                aes256 = AES256(bytes(key))
+                try:
+                    decrypted_data = aes256.decrypt(data)
+                    setFileContent(filepath, decrypted_data)
+                    qtnEncryptedFiles = getQtnEncryptedFiles()
+                    setQtnEncryptedFiles(((qtnEncryptedFiles - 1) if qtnEncryptedFiles > 1 else 0))
+                    logging.info(f"File {filepath} DECRYPTED\n")
+                    file_decrypted = True
+                except Exception as e:
+                    raise e
+            else:
+                logging.error(f"FILE \"{filepath}\" NOT ENCRYPTED")
+                logging.error(f"OR")
+                logging.error(f"ENCRYPTED FILE HAS BEEN TAMPERED WITH\n")
+    finally:    
+        for s, k in salts_dict.items():
+            clear_bytearray(k)    
+        salts_dict.clear()
+        del salts_dict
+        gc.collect()
 
     if file_decrypted and (option == 4):
         openFileAfterDecryption(files[0], pwd)
