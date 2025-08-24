@@ -79,6 +79,7 @@ class AES256:
 
     @staticmethod
     def get_token_data(token: bytes | str) -> tuple[int, bytes]:
+        MIN_LEN = 9 + 16 + 32  # header (9) + IV (16) + HMAC (32)
         if not isinstance(token, (str, bytes)):
             raise TypeError("token must be bytes or str")
         
@@ -87,10 +88,10 @@ class AES256:
         except (TypeError, binascii.Error):
             raise InvalidToken
         
-        if not data or ((data[0] != 0x03) or (data[1] != 0x02) or (data[2] != 0x03)):
+        if len(data) < MIN_LEN:
             raise InvalidToken
-        
-        if len(data) < 9:
+
+        if not data or ((data[0] != 0x03) or (data[1] != 0x02) or (data[2] != 0x03)):
             raise InvalidToken
         
         timestamp = int.from_bytes(data[3:9], byteorder="big")

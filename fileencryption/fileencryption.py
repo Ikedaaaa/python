@@ -86,7 +86,7 @@ def resetPassword():
 def checkPassword(password_input, password_old_hash=""):
     logging.info(f"Checking Password\n")
     password_hash = getPassword() if password_old_hash == "" else password_old_hash
-    return bcrypt.checkpw(password_input.encode(), password_hash)
+    return bcrypt.checkpw(bytes(password_input), password_hash)
 
 def generateSalt(work_factor):
     return bcrypt.gensalt(rounds=work_factor)
@@ -101,7 +101,7 @@ def deriveKey(p_salt, password):
         ad=None,
         secret=None,
     )
-    return kdf.derive(password.encode())
+    return kdf.derive(bytes(password))
 
 def generateKey(p_salt, password):
     #generate key from salt and password and encode it using Base 64
@@ -148,6 +148,7 @@ def encrypt(pwd, files):
             try:
                 if key:
                     clear_bytearray(key)
+                    key = None
                     gc.collect()
                 encrypted_data = aes256.encrypt(getFileContent(filepath))
                 data_with_header = add_header_to_data(salt, encrypted_data)
@@ -164,6 +165,7 @@ def encrypt(pwd, files):
     finally:
         if key:
             clear_bytearray(key)
+        key = None
         del key
         gc.collect()
         
@@ -193,8 +195,6 @@ def clear_bytearray(bytearray_object):
     for i in range(len(bytearray_object)):
         bytearray_object[i] = 0
 
-    bytearray_object = None
-
 def decrypt(pwd, files, option):
     salts_dict = {}
     file_decrypted = False
@@ -222,11 +222,13 @@ def decrypt(pwd, files, option):
             else:
                 logging.error(f"FILE \"{filepath}\" NOT ENCRYPTED")
                 logging.error(f"OR")
-                logging.error(f"ENCRYPTED FILE HAS BEEN TAMPERED WITH\n")
+                logging.error(f"FILE HAS BEEN TAMPERED WITH\n")
     finally:    
         for s, k in salts_dict.items():
-            clear_bytearray(k)    
+            clear_bytearray(k)
+            k = None
         salts_dict.clear()
+        salts_dict = None
         del salts_dict
         gc.collect()
 
@@ -384,11 +386,12 @@ def onSelectEncryptionOption(option):
             t1 = time.perf_counter_ns()
 
         if len(files) > 0:
-            encrypt_decrypt(files, bytes(pwd).decode(), option)
+            encrypt_decrypt(files, pwd, option)
         else:
             logging.error("No file was inputted!\n")
     finally:    
         clear_bytearray(pwd)
+        pwd = None
         del pwd
         gc.collect()
 
