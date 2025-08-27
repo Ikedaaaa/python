@@ -1,4 +1,5 @@
-from aes256_cbc import AES256
+from aes256_cbc import AES256_CBC
+from aes256_gcm import AES256_GCM
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
 from tkinter import filedialog, Tk
@@ -12,12 +13,14 @@ from secrets import token_bytes
 from hashlib import sha256
 from time import sleep, perf_counter_ns
 from gc import collect
-from os.path import dirname
+from os.path import dirname, getsize
 from os import fdopen, fsync, replace, remove
 from tempfile import mkstemp
 
 import logging
 import ctypes
+
+LARGE_FILE_SIZE = ((100*1024)*1024) # 100 MiB. Minimum size for files to be considered large
 
 kernel32 = ctypes.windll.kernel32
 user32 = ctypes.windll.user32
@@ -152,6 +155,11 @@ def add_header_to_data(p_salt, data):
     b64_hash = urlsafe_b64encode(salt_hash)
     return (b64_hash[:86] + b64_salt[:22] + data)
 
+def aes256_cbc_encryption(aes256, file, salt):
+    encrypted_data = aes256.encrypt(getFileContent(file))
+    data_with_header = add_header_to_data(salt, encrypted_data)
+    setFileContent(file, data_with_header)
+
 def encrypt(pwd, files):
     input_text = f"\nType \"1\" to generate a new salt and key for each file.\nType any other number to use the same: "
     new_salt_each_file = (True if (len(files) <= 1) else (int(input(input_text)) == 1))
@@ -159,30 +167,42 @@ def encrypt(pwd, files):
     salt = token_bytes(16)
     key = bytearray(generateKey(salt, pwd))
     try:
-        aes256 = AES256(bytes(key))
+        aes256_cbc = AES256_CBC(bytes(key))
+        aes256_gcm = AES256_GCM(bytes(key), salt)
+        is_large_file = (getsize(files[0]) >= LARGE_FILE_SIZE)
         for idx, filepath in enumerate(files):
             try:
+                aes256 = (aes256_gcm if is_large_file else aes256_cbc)
                 if key:
                     clear_bytearray(key)
                     key = None
                     collect()
-                encrypted_data = aes256.encrypt(getFileContent(filepath))
-                data_with_header = add_header_to_data(salt, encrypted_data)
-                setFileContent(filepath, data_with_header)
+
+                if not is_large_file:
+                    aes256_cbc_encryption(aes256, filepath, salt)
+                else:
+                    aes256.encrypt(filepath)
+                
                 setQtnEncryptedFiles(getQtnEncryptedFiles() + 1)
                 logging.info(f"File {filepath} ENCRYPTED\n")
                 
-                if (idx < (len(files) - 1)) and new_salt_each_file:
-                    salt = token_bytes(16)
-                    key = bytearray(generateKey(salt, pwd))
-                    aes256 = AES256(bytes(key))
+                if (idx < (len(files) - 1)):
+                    is_large_file = (getsize(files[idx+1]) >= LARGE_FILE_SIZE)
+                    if new_salt_each_file:
+                        salt = token_bytes(16)
+                        key = bytearray(generateKey(salt, pwd))
+                        
+                        if is_large_file:
+                            aes256_gcm = AES256_GCM(bytes(key), salt)
+                        else:
+                            aes256_cbc = AES256_CBC(bytes(key))
             except Exception as e:
                 raise e
     finally:
         if key:
             clear_bytearray(key)
-        key = None
-        del key
+        key = aes256_cbc = aes256_gcm = None
+        del key, aes256_cbc, aes256_gcm
         collect()
         
 def get_salt_and_content_from_file(file):
@@ -225,7 +245,7 @@ def decrypt(pwd, files, option):
                     key = bytearray(generateKey(salt, pwd))
                     salts_dict[salt] = key
                 
-                aes256 = AES256(bytes(key))
+                aes256 = AES256_CBC(bytes(key))
                 try:
                     decrypted_data = aes256.decrypt(data)
                     setFileContent(filepath, decrypted_data)

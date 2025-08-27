@@ -10,7 +10,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, hmac, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-class AES256:
+class AES256_CBC:
     def __init__(self, key: bytes):
         try:
             key = urlsafe_b64decode(key)
@@ -34,28 +34,28 @@ class AES256:
         ).encryptor()
         ciphertext = encryptor.update(padded) + encryptor.finalize()
 
-        token = (
-            b'\x03\x02\x03'
-            + int(time()).to_bytes(length=6, byteorder="big")
-            + iv
-            + ciphertext
+        header = (
+            b'\x03\x02\x03\x01' # CBC version 1
+            + int(time()).to_bytes(length=5, byteorder="big")
         )
+        header_b64 = urlsafe_b64encode(header)
+        token = (iv+ ciphertext)
 
         h = hmac.HMAC(self.signing_key, hashes.SHA256())
-        h.update(token)
+        h.update(header + token)
         tag = h.finalize()
 
-        return urlsafe_b64encode(token + tag)
+        return header_b64 + urlsafe_b64encode(token + tag)
     
     def decrypt(self, token: bytes, ttl: int | None = None) -> bytes:
-        timestamp, decoded = AES256.get_token_data(token)
+        timestamp, decoded = AES256_CBC.get_token_data(token)
         iv = decoded[9:25]
         ciphertext = decoded[25:-32]
 
         self.check_signature(decoded)
 
         if (ttl is not None) and (ttl > 0):
-            AES256.check_time(ttl, timestamp)
+            AES256_CBC.check_time(ttl, timestamp)
 
         decryptor = Cipher(
             algorithms.AES256(self.encryption_key),
@@ -83,19 +83,23 @@ class AES256:
         if not isinstance(token, (str, bytes)):
             raise TypeError("token must be bytes or str")
         
+        if len(token) < 12:
+            raise InvalidToken
+        
         try:
-            data = urlsafe_b64decode(token)
+            header_decoded = urlsafe_b64decode(token[:12])
+            data = urlsafe_b64decode(token[12:])
         except (TypeError, binascii.Error):
             raise InvalidToken
         
-        if len(data) < MIN_LEN:
+        if (len(header_decoded) + len(data)) < MIN_LEN:
             raise InvalidToken
 
-        if not data or ((data[0] != 0x03) or (data[1] != 0x02) or (data[2] != 0x03)):
+        if not header_decoded or ((header_decoded[0] != 0x03) or (header_decoded[1] != 0x02) or (header_decoded[2] != 0x03)):
             raise InvalidToken
         
-        timestamp = int.from_bytes(data[3:9], byteorder="big")
-        return timestamp, data
+        timestamp = int.from_bytes(header_decoded[4:9], byteorder="big")
+        return timestamp, (header_decoded + data)
     
     def check_signature(self, data: bytes) -> None:
         h = hmac.HMAC(self.signing_key, hashes.SHA256())
