@@ -110,7 +110,7 @@ def deriveKey(p_salt, password):
     return kdf.derive(bytes(password))
 
 def generateKey(p_salt, password):
-    #generate key from salt and password and encode it using Base 64
+    #generate key from salt and password
     logging.info("Deriving Criptography key from password\n")
     
     if time_ctrl:
@@ -122,7 +122,7 @@ def generateKey(p_salt, password):
         t2 = perf_counter_ns()
         log_time_ctrl(t1, t2, "Derive key")
     
-    return urlsafe_b64encode(derived_key)
+    return derived_key
 
 def get_file_bytes(filename, bytes_to_read, bytes_to_start=None):
     with open(filename, "rb") as readfile:
@@ -151,15 +151,13 @@ def setFileContent(src_file, data):
             pass
         raise
 
-def add_header_to_data(p_salt, data):
-    b64_salt = urlsafe_b64encode(p_salt)
-    salt_hash = sha256(b64_salt).hexdigest().encode()
-    b64_hash = urlsafe_b64encode(salt_hash)
-    return (b64_hash[:86] + b64_salt[:22] + data)
+def add_header(p_salt):
+    salt_hash = sha256(p_salt).digest()
+    return (salt_hash + p_salt)
 
 def aes256_cbc_encryption(aes256, file, salt):
     encrypted_data = aes256.encrypt(getFileContent(file))
-    data_with_header = add_header_to_data(salt, encrypted_data)
+    data_with_header = add_header(salt) + encrypted_data
     setFileContent(file, data_with_header)
 
 def encrypt(pwd, files):
@@ -208,23 +206,17 @@ def encrypt(pwd, files):
         collect()
         
 def get_salt_from_file(file):
-    header = get_file_bytes(file, 108)
-    if len(header) != 108:
+    header = get_file_bytes(file, 48)
+    if len(header) != 48:
         return b''
     
-    b64_hash = header[:86] + b'=='
-    b64_salt = header[86:] + b'=='
-
-    try:
-        hex_hash = urlsafe_b64decode(b64_hash).decode()
-    except:
-        return b''
-    
-    salt_hash = sha256(b64_salt).hexdigest()
-    if hex_hash != salt_hash:
+    salt_hash_file = header[:32]
+    salt = header[32]
+    salt_hash = sha256(salt).digest()
+    if salt_hash_file != salt_hash:
         return b''
 
-    return urlsafe_b64decode(b64_salt)
+    return salt
 
 def get_encryption_mode_and_version(file):
     header = urlsafe_b64decode(get_file_bytes(file, 12, 108))

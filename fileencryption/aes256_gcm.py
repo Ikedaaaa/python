@@ -15,13 +15,13 @@ CHUNK_SIZE = ((2 * 1024) * 1024) # 2 MiB chunks
 MIN_LENGTH = (108 + 12 + 16 + 16) # 108 Salt Header + 12 b64 header + 16 b64 Nonce + 16 tag
 
 class AES256_GCM:
-    def __init__(self, key: bytes, salt: bytes):
+    def __init__(self, p_key: bytes, salt: bytes | None = None):
         try:
-            key = urlsafe_b64decode(key)
+            key = p_key
         except binascii.Error as exc:
-            raise ValueError("Key must be 64 url-safe base64-encoded bytes.") from exc
+            raise ValueError("Key must be 64 bytes.") from exc
         if len(key) != 64:
-            raise ValueError("Key must be 64 url-safe base64-encoded bytes.")
+            raise ValueError("Key must be 64 bytes.")
         self.key = key[32:]
         self.salt = salt
 

@@ -1,6 +1,6 @@
 import binascii
 
-from base64 import urlsafe_b64encode, urlsafe_b64decode
+#from base64 import urlsafe_b64encode, urlsafe_b64decode
 from secrets import token_bytes
 from time import time
 
@@ -11,13 +11,13 @@ from cryptography.hazmat.primitives import hashes, hmac, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 class AES256_CBC:
-    def __init__(self, key: bytes):
+    def __init__(self, p_key: bytes):
         try:
-            key = urlsafe_b64decode(key)
+            key = p_key
         except binascii.Error as exc:
-            raise ValueError("Key must be 64 url-safe base64-encoded bytes.") from exc
+            raise ValueError("Key must be 64 bytes.") from exc
         if len(key) != 64:
-            raise ValueError("Key must be 64 url-safe base64-encoded bytes.")
+            raise ValueError("Key must be 64 bytes.")
         self.signing_key = key[:32]
         self.encryption_key = key[32:]
 
@@ -38,14 +38,13 @@ class AES256_CBC:
             b'\x03\x02\x03\x01' # CBC version 1
             + int(time()).to_bytes(length=5, byteorder="big")
         )
-        header_b64 = urlsafe_b64encode(header)
-        token = (iv+ ciphertext)
+        token = (iv + ciphertext)
 
         h = hmac.HMAC(self.signing_key, hashes.SHA256())
         h.update(header + token)
         tag = h.finalize()
 
-        return header_b64 + urlsafe_b64encode(token + tag)
+        return (header + token + tag)
     
     def decrypt(self, token: bytes, ttl: int | None = None) -> bytes:
         timestamp, decoded = AES256_CBC.get_token_data(token)
