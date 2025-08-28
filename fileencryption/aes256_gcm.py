@@ -1,6 +1,8 @@
-import os
 import binascii
 
+from os import fdopen, fsync, replace, remove, SEEK_END
+from os.path import dirname, getsize
+from tempfile import mkstemp
 from base64 import urlsafe_b64encode, urlsafe_b64decode
 from secrets import token_bytes
 from hashlib import sha256
@@ -17,9 +19,9 @@ class AES256_GCM:
         try:
             key = urlsafe_b64decode(key)
         except binascii.Error as exc:
-            raise ValueError("Key must be 32 url-safe base64-encoded bytes.") from exc
-        if len(key) != 32:
-            raise ValueError("Key must be 32 url-safe base64-encoded bytes.")
+            raise ValueError("Key must be 64 url-safe base64-encoded bytes.") from exc
+        if len(key) != 64:
+            raise ValueError("Key must be 64 url-safe base64-encoded bytes.")
         self.key = key[32:]
         self.salt = salt
 
@@ -30,10 +32,10 @@ class AES256_GCM:
             modes.GCM(nonce)
         ).encryptor()
 
-        dir_name = os.path.dirname(file) or "."
-        fd, tmp_path = os.mkstemp(dir=dir_name)
+        dir_name = dirname(file) or "."
+        fd, tmp_path = mkstemp(dir=dir_name)
         try:
-            with open(file, "rb") as f_in, os.fdopen(fd, "wb") as f_out:
+            with open(file, "rb") as f_in, fdopen(fd, "wb") as f_out:
                 salt_header = self.get_salt_header()
                 f_out.write(salt_header)
                 
@@ -48,27 +50,27 @@ class AES256_GCM:
                 f_out.write(encryptor.tag)
 
                 f_out.flush()
-                os.fsync(f_out.fileno())
+                fsync(f_out.fileno())
 
-            os.replace(tmp_path, file)
+            replace(tmp_path, file)
 
         except Exception:
             try:
-                os.remove(tmp_path)
+                remove(tmp_path)
             except OSError:
                 pass
             raise
 
     def decrypt(self, file: str, ttl: int | None = None):
-        dir_name = os.path.dirname(file) or "."
-        fd, tmp_path = os.mkstemp(dir=dir_name)
+        dir_name = dirname(file) or "."
+        fd, tmp_path = mkstemp(dir=dir_name)
         try:
-            with open(file, "rb") as f_in, os.fdopen(fd, "wb") as f_out:
+            with open(file, "rb") as f_in, fdopen(fd, "wb") as f_out:
                 #validate file size
-                if os.path.getsize(file) <= MIN_LENGTH:
+                if getsize(file) <= MIN_LENGTH:
                     raise InvalidToken
                 
-                f_in.seek(-16, os.SEEK_END)
+                f_in.seek(-16, SEEK_END)
                 ciphertext_end_byte = f_in.tell()
                 tag = f_in.read(16)
                 
@@ -97,13 +99,13 @@ class AES256_GCM:
                 decryptor.finalize()
 
                 f_out.flush()
-                os.fsync(f_out.fileno())
+                fsync(f_out.fileno())
 
             # replace atomically
-            os.replace(tmp_path, file)
+            replace(tmp_path, file)
         except Exception:
             try:
-                os.remove(tmp_path)
+                remove(tmp_path)
             except OSError:
                 pass
             raise InvalidToken
@@ -118,7 +120,7 @@ class AES256_GCM:
     @staticmethod
     def get_file_header() -> bytes:
         header = (
-            + b'\x07\x03\x0d\x01' # GCM version 1
+            b'\x07\x03\x0d\x01' # GCM version 1
             + int(time()).to_bytes(length=5, byteorder="big")
         )
         return header
