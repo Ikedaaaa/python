@@ -124,9 +124,11 @@ def generateKey(p_salt, password):
     
     return urlsafe_b64encode(derived_key)
 
-def get_file_header(filename):
+def get_file_bytes(filename, bytes_to_read, bytes_to_start=None):
     with open(filename, "rb") as readfile:
-        return readfile.read(108)
+        if bytes_to_start and (bytes_to_start > 0):
+            readfile.seek(bytes_to_start)
+        return readfile.read(bytes_to_read)
 
 def getFileContent(filename):
     with open(filename, "rb") as readfile:
@@ -205,10 +207,10 @@ def encrypt(pwd, files):
         del key, aes256_cbc, aes256_gcm
         collect()
         
-def get_salt_and_content_from_file(file):
-    header = get_file_header(file)
+def get_salt_from_file(file):
+    header = get_file_bytes(file, 108)
     if len(header) != 108:
-        return (b'', b'')
+        return b''
     
     b64_hash = header[:86] + b'=='
     b64_salt = header[86:] + b'=='
@@ -216,17 +218,26 @@ def get_salt_and_content_from_file(file):
     try:
         hex_hash = urlsafe_b64decode(b64_hash).decode()
     except:
-        return (b'', b'')
-    salt_hash = sha256(b64_salt).hexdigest()
-
-    if hex_hash != salt_hash:
-        return (b'', b'')
+        return b''
     
-    all_data = getFileContent(file)
-    content = all_data[108:]
+    salt_hash = sha256(b64_salt).hexdigest()
+    if hex_hash != salt_hash:
+        return b''
 
-    return (urlsafe_b64decode(b64_salt), content)
+    return urlsafe_b64decode(b64_salt)
 
+def get_encryption_mode_and_version(file):
+    header = urlsafe_b64decode(get_file_bytes(file, 12, 108))
+
+    if len(header) > 0:
+        if ((header[0] == 0x03) and (header[1] == 0x02) and (header[2] == 0x03)) and (header[3] == 0x01):
+            return 'CBC', 1
+        
+        if ((header[0] == 0x07) and (header[1] == 0x03) and (header[2] == 0x0D)) and (header[3] == 0x01):
+            return 'GCM', 1
+    
+    return '', 0
+    
 def clear_bytearray(bytearray_object):
     for i in range(len(bytearray_object)):
         bytearray_object[i] = 0
@@ -234,21 +245,27 @@ def clear_bytearray(bytearray_object):
 def decrypt(pwd, files, option):
     salts_dict = {}
     file_decrypted = False
-
     try:
         for filepath in files:
-            salt, data = get_salt_and_content_from_file(filepath)
-            if len(salt) == 16:
-                key = bytearray(salts_dict.get(salt, b''))
-                
-                if not key:
-                    key = bytearray(generateKey(salt, pwd))
-                    salts_dict[salt] = key
-                
-                aes256 = AES256_CBC(bytes(key))
+            salt = get_salt_from_file(filepath)
+            encryption_mode, version = get_encryption_mode_and_version(filepath)
+            if (len(salt) == 16) and (encryption_mode != '') and (version > 0):
                 try:
-                    decrypted_data = aes256.decrypt(data)
-                    setFileContent(filepath, decrypted_data)
+                    key = bytearray(salts_dict.get(salt, b''))
+                    
+                    if not key:
+                        key = bytearray(generateKey(salt, pwd))
+                        salts_dict[salt] = key
+
+                    if (encryption_mode == 'CBC') and (version == 1):
+                        aes256 = AES256_CBC(bytes(key))
+                        data = getFileContent(filepath)[108:]
+                        decrypted_data = aes256.decrypt(data)
+                        setFileContent(filepath, decrypted_data)
+                    elif (encryption_mode == 'GCM') and (version == 1):
+                        aes256 = AES256_GCM(bytes(key), b'')
+                        aes256.decrypt(filepath)
+                    
                     qtnEncryptedFiles = getQtnEncryptedFiles()
                     setQtnEncryptedFiles(((qtnEncryptedFiles - 1) if qtnEncryptedFiles > 1 else 0))
                     logging.info(f"File {filepath} DECRYPTED\n")
