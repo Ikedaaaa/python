@@ -1,6 +1,5 @@
 import binascii
 
-#from base64 import urlsafe_b64encode, urlsafe_b64decode
 from secrets import token_bytes
 from time import time
 
@@ -82,23 +81,20 @@ class AES256_CBC:
         if not isinstance(token, (str, bytes)):
             raise TypeError("token must be bytes or str")
         
-        if len(token) < 12:
+        if len(token) < MIN_LEN:
             raise InvalidToken
         
         try:
-            header_decoded = urlsafe_b64decode(token[:12])
-            data = urlsafe_b64decode(token[12:])
+            header = token[:9]
+            data = token[9:]
         except (TypeError, binascii.Error):
             raise InvalidToken
-        
-        if (len(header_decoded) + len(data)) < MIN_LEN:
-            raise InvalidToken
 
-        if not header_decoded or ((header_decoded[0] != 0x03) or (header_decoded[1] != 0x02) or (header_decoded[2] != 0x03)):
+        if not header or ((header[0] != 0x03) or (header[1] != 0x02) or (header[2] != 0x03)):
             raise InvalidToken
         
-        timestamp = int.from_bytes(header_decoded[4:9], byteorder="big")
-        return timestamp, (header_decoded + data)
+        timestamp = int.from_bytes(header[4:9], byteorder="big")
+        return timestamp, (header + data)
     
     def check_signature(self, data: bytes) -> None:
         h = hmac.HMAC(self.signing_key, hashes.SHA256())

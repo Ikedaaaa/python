@@ -211,7 +211,7 @@ def get_salt_from_file(file):
         return b''
     
     salt_hash_file = header[:32]
-    salt = header[32]
+    salt = header[32:]
     salt_hash = sha256(salt).digest()
     if salt_hash_file != salt_hash:
         return b''
@@ -219,7 +219,7 @@ def get_salt_from_file(file):
     return salt
 
 def get_encryption_mode_and_version(file):
-    header = urlsafe_b64decode(get_file_bytes(file, 12, 108))
+    header = get_file_bytes(file, 9, 48)
 
     if len(header) > 0:
         if ((header[0] == 0x03) and (header[1] == 0x02) and (header[2] == 0x03)) and (header[3] == 0x01):
@@ -251,7 +251,7 @@ def decrypt(pwd, files, option):
 
                     if (encryption_mode == 'CBC') and (version == 1):
                         aes256 = AES256_CBC(bytes(key))
-                        data = getFileContent(filepath)[108:]
+                        data = getFileContent(filepath)[48:]
                         decrypted_data = aes256.decrypt(data)
                         setFileContent(filepath, decrypted_data)
                     elif (encryption_mode == 'GCM') and (version == 1):

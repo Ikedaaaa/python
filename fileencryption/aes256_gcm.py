@@ -12,7 +12,7 @@ from cryptography.fernet import InvalidToken
 from aes256_cbc import AES256_CBC
 
 CHUNK_SIZE = ((2 * 1024) * 1024) # 2 MiB chunks
-MIN_LENGTH = (108 + 12 + 16 + 16) # 108 Salt Header + 12 b64 header + 16 b64 Nonce + 16 tag
+MIN_LENGTH = (48 + 9 + 12 + 16) # 48 Salt Header + 9 header + 12 Nonce + 16 tag
 
 class AES256_GCM:
     def __init__(self, p_key: bytes, salt: bytes | None = None):
@@ -41,7 +41,7 @@ class AES256_GCM:
                 
                 header = (AES256_GCM.get_file_header() + nonce)
                 encryptor.authenticate_additional_data(header)
-                f_out.write(urlsafe_b64encode(header))
+                f_out.write(header)
 
                 while chunk := f_in.read(CHUNK_SIZE):
                     f_out.write(encryptor.update(chunk))
@@ -74,13 +74,13 @@ class AES256_GCM:
                 ciphertext_end_byte = f_in.tell()
                 tag = f_in.read(16)
                 
-                f_in.seek(108) # Start of header
-                header = urlsafe_b64decode(f_in.read(12))
+                f_in.seek(48) # Start of header
+                header = f_in.read(9)
                 if (ttl is not None) and (ttl > 0):
                     timestamp = int.from_bytes(header[4:9], byteorder="big")
                     AES256_CBC.check_time(ttl, timestamp)
 
-                nonce = urlsafe_b64decode(f_in.read(16))
+                nonce = f_in.read(12)
 
                 decryptor = Cipher(
                     algorithms.AES256(self.key),
@@ -111,11 +111,8 @@ class AES256_GCM:
             raise InvalidToken
 
     def get_salt_header(self) -> bytes:
-        b64_salt = urlsafe_b64encode(self.salt)
-        salt_hash = sha256(b64_salt).hexdigest().encode()
-        b64_hash = urlsafe_b64encode(salt_hash)
-
-        return (b64_hash[:86] + b64_salt[:22])
+        salt_hash = sha256(self.salt).digest()
+        return (salt_hash + self.salt)
 
     @staticmethod
     def get_file_header() -> bytes:
