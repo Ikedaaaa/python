@@ -26,7 +26,6 @@ class AES256_GCM:
         self.salt = salt
 
     def encrypt(self, file: str):
-        print("Using GCM")
         nonce = token_bytes(12)
         encryptor = Cipher(
             algorithms.AES256(self.key),
@@ -63,7 +62,6 @@ class AES256_GCM:
             raise
 
     def decrypt(self, file: str, ttl: int | None = None):
-        print("Using GCM")
         dir_name = dirname(file) or "."
         fd, tmp_path = mkstemp(dir=dir_name)
         try:

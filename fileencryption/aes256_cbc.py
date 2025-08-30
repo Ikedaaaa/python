@@ -22,7 +22,7 @@ class AES256_CBC:
 
     def encrypt(self, plaintext: bytes) -> bytes:
         utils._check_bytes("data", plaintext)
-        print("Using CBC")
+        
         padder = padding.PKCS7(algorithms.AES256.block_size).padder()
         padded = padder.update(plaintext) + padder.finalize()
 
@@ -46,7 +46,6 @@ class AES256_CBC:
         return (header + token + tag)
     
     def decrypt(self, token: bytes, ttl: int | None = None) -> bytes:
-        print("Using CBC")
         timestamp, decoded = AES256_CBC.get_token_data(token)
         iv = decoded[9:25]
         ciphertext = decoded[25:-32]
