@@ -3,7 +3,6 @@ import binascii
 from os import fdopen, fsync, replace, remove, SEEK_END
 from os.path import dirname, getsize
 from tempfile import mkstemp
-from base64 import urlsafe_b64encode, urlsafe_b64decode
 from secrets import token_bytes
 from hashlib import sha256
 from time import time

@@ -5,7 +5,6 @@ from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 from tkinter import filedialog, Tk
 from configparser import RawConfigParser
 
-from base64 import urlsafe_b64encode, urlsafe_b64decode
 from getpass import getpass
 from bcrypt import hashpw, checkpw, gensalt
 from subprocess import run
