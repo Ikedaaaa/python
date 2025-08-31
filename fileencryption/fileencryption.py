@@ -49,22 +49,29 @@ def getPassword():
         return pwdFile.read()
 
 def setPassword():
-    senha1 = getpass("\nType your new password: ")
-    senha2 = getpass("Confirm your new password: ")
+    try:
+        senha1 = bytearray(getpass("\nType your new password: ").encode())
+        senha2 = bytearray(getpass("Confirm your new password: ").encode())
 
-    while senha1 != senha2:
-        logging.warning("THE PASSWORDS DON'T MATCH\n")
-        senha1 = getpass("Type your new password: ")
-        senha2 = getpass("Confirm your new password: ")
+        while senha1 != senha2:
+            logging.warning("THE PASSWORDS DON'T MATCH\n")
+            senha1 = bytearray(getpass("Type your new password: ").encode())
+            senha2 = bytearray(getpass("Confirm your new password: ").encode())
 
-    workFactor = int(input("Salt work factor (0 to use the standard = 12): "))
-    salt = generateSalt((workFactor if workFactor > 0 else 12))
+        workFactor = int(input("Salt work factor (0 to use the standard = 12): "))
+        salt = generateSalt((workFactor if workFactor > 0 else 12))
 
-    logging.info(f"Generating new Bcrypt hash with Work Factor of {(workFactor if workFactor > 0 else 12)}\n")
-    with open("password.hash", "wb") as pwdFile:
-        pwdFile.write(hashpw(senha1.encode(), salt))
+        logging.info(f"Generating new Bcrypt hash with Work Factor of {(workFactor if workFactor > 0 else 12)}\n")
+        with open("password.hash", "wb") as pwdFile:
+            pwdFile.write(hashpw(bytes(senha1), salt))
 
-    logging.info("New password set successfully\n")
+        logging.info("New password set successfully\n")
+    finally:
+        clear_bytearray(senha1)
+        clear_bytearray(senha2)
+        senha1 = senha2 = None
+        del senha1, senha2
+        collect()
 
 def resetPassword():
     qtnEncryptedFiles = getQtnEncryptedFiles()
@@ -72,13 +79,19 @@ def resetPassword():
         password_hash = getPassword()
 
         if qtnEncryptedFiles <= 0:
-            password_old = getpass("\nType your old password: ")
+            try:
+                password_old = bytearray(getpass("\nType your old password: ").encode())
 
-            if checkPassword(password_old, password_hash):
-                print("****** Reset password ******")
-                setPassword()
-            else:
-                logging.error("PASSWORDS DON'T MATCH")
+                if checkPassword(password_old, password_hash):
+                    print("****** Reset password ******")
+                    setPassword()
+                else:
+                    logging.error("PASSWORDS DON'T MATCH")
+            finally:
+                clear_bytearray(password_old)
+                password_old = None
+                del password_old
+                collect()
         else:
             logging.error(f"{encryptedFilesStr(qtnEncryptedFiles)} decrypt them before resetting your password")
             changePwdWithEncryptedFilesInfo()
