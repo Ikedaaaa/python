@@ -15,6 +15,7 @@ from gc import collect
 from os.path import dirname, getsize
 from os import fdopen, fsync, replace, remove
 from tempfile import mkstemp
+from multiprocessing import Pool
 
 import logging
 import ctypes
@@ -76,9 +77,15 @@ def setPassword():
 def resetPassword():
     qtnEncryptedFiles = getQtnEncryptedFiles()
     try:
-        password_hash = getPassword()
+        hashes_list = getPassword().split(b'\r\n')
 
-        if qtnEncryptedFiles <= 0:
+        continue_pwd_reset = True
+        if (qtnEncryptedFiles > 0) and (len(hashes_list) > 1):
+            logging.warning(f"{encryptedFilesStr(qtnEncryptedFiles)}")
+            changePwdWithEncryptedFilesInfo()
+            continue_pwd_reset = (int(input("Type \"1\" to continue with password reset. Type any other number to abort: ")) == 1)
+        
+        if continue_pwd_reset:
             try:
                 password_old = bytearray(getpass("\nType your old password: ").encode())
 
@@ -92,9 +99,7 @@ def resetPassword():
                 password_old = None
                 del password_old
                 collect()
-        else:
-            logging.error(f"{encryptedFilesStr(qtnEncryptedFiles)} decrypt them before resetting your password")
-            changePwdWithEncryptedFilesInfo()
+            
     except FileNotFoundError:
         if qtnEncryptedFiles > 0:
             logging.warning(f"{encryptedFilesStr(qtnEncryptedFiles)} but the password.hash file appears to be missing. Make sure to set the exact password that was used to encrypt these files previously\n")
@@ -105,6 +110,15 @@ def checkPassword(password_input, password_old_hash=""):
     logging.info(f"Checking Password\n")
     password_hash = getPassword() if password_old_hash == "" else password_old_hash
     return checkpw(bytes(password_input), password_hash)
+
+def check_password_in_parallel(password_input, hashes):
+    pool = Pool()
+    result1 = pool.apply_async(checkpw, [bytes(password_input), hashes[0]])
+    result2 = pool.apply_async(checkpw, [bytes(password_input), hashes[1]])
+    pool.close()
+    answer1 = result1.get(timeout=60)
+    answer2 = result2.get(timeout=60)
+    pool.join()
 
 def generateSalt(work_factor):
     return gensalt(rounds=work_factor)
