@@ -49,7 +49,7 @@ def getPassword():
     with open("password.hash", "rb") as pwdFile:
         return pwdFile.read()
 
-def setPassword():
+def setPassword(second_password=False):
     try:
         senha1 = bytearray(getpass("\nType your new password: ").encode())
         senha2 = bytearray(getpass("Confirm your new password: ").encode())
@@ -63,8 +63,13 @@ def setPassword():
         salt = generateSalt((workFactor if workFactor > 0 else 12))
 
         logging.info(f"Generating new Bcrypt hash with Work Factor of {(workFactor if workFactor > 0 else 12)}\n")
-        with open("password.hash", "wb") as pwdFile:
-            pwdFile.write(hashpw(bytes(senha1), salt))
+        if second_password:
+            with open("password.hash", "ab") as pwdFile:
+                pwdFile.write(b'\r\n')
+                pwdFile.write(hashpw(bytes(senha1), salt))
+        else:
+            with open("password.hash", "wb") as pwdFile:
+                pwdFile.write(hashpw(bytes(senha1), salt))
 
         logging.info("New password set successfully\n")
     finally:
@@ -75,34 +80,58 @@ def setPassword():
         collect()
 
 def resetPassword():
+    set_same_pwd_str = "Make sure to set the exact password that was used to encrypt these files previously"
     qtnEncryptedFiles = getQtnEncryptedFiles()
     try:
         hashes_list = getPassword().split(b'\r\n')
 
-        continue_pwd_reset = True
-        if (qtnEncryptedFiles > 0) and (len(hashes_list) > 1):
-            logging.warning(f"{encryptedFilesStr(qtnEncryptedFiles)}")
-            changePwdWithEncryptedFilesInfo()
-            continue_pwd_reset = (int(input("Type \"1\" to continue with password reset. Type any other number to abort: ")) == 1)
-        
-        if continue_pwd_reset:
-            try:
-                password_old = bytearray(getpass("\nType your old password: ").encode())
+        if len(hashes_list) > 0 and (len(hashes_list[0]) == 60):
+            reset_pwd = True
+            add_password = False
+            delete_password = False
+            if len(hashes_list) < 2:
+                print("\nDo you want to add another password or change the current one?")
+                add_password = (int(input("Type \"1\" to add another password. Type any other number to reset the current one: ")) == 1)
+                reset_pwd = not add_password
+            else:
+                print("\nDo you want to delete one of the passwords or change one of them?")
+                delete_password = (int(input("Type \"1\" to delete a password. Type any other number to reset one of them: ")) == 1)
+                reset_pwd = not delete_password
 
-                if checkPassword(password_old, password_hash):
-                    print("****** Reset password ******")
-                    setPassword()
-                else:
-                    logging.error("PASSWORDS DON'T MATCH")
-            finally:
-                clear_bytearray(password_old)
-                password_old = None
-                del password_old
-                collect()
+            if (qtnEncryptedFiles > 0) and (reset_pwd or delete_password):
+                logging.warning(f"{encryptedFilesStr(qtnEncryptedFiles)}")
+                changePwdWithEncryptedFilesInfo()
+                print("Are you want to proceed?")
+                if (int(input("Type \"1\" to continue. Type any other number to abort: ")) != 1):
+                    return
+                
+            if add_password:
+                setPassword(True)
+            else:
+                try:
+                    input_str_pwd = ("\nType your old password: " if reset_pwd else "\nType the password you want to delete: ")
+                    password_input = bytearray(getpass(input_str_pwd).encode())
+
+                    if checkPassword(password_input, password_hash):
+                        print("****** Reset password ******")
+                        setPassword()
+                    else:
+                        logging.error("PASSWORDS DON'T MATCH")
+                finally:
+                    clear_bytearray(password_old)
+                    password_old = None
+                    del password_old
+                    collect()
+        else:
+            logging.warning("Invalid hash in the password.hash file. You will have to set a new password.\n")
+            if qtnEncryptedFiles > 0:
+                logging.warning(f"{encryptedFilesStr(qtnEncryptedFiles)}")
+                logging.warning(f"{set_same_pwd_str}\n")
+            setPassword()
             
     except FileNotFoundError:
         if qtnEncryptedFiles > 0:
-            logging.warning(f"{encryptedFilesStr(qtnEncryptedFiles)} but the password.hash file appears to be missing. Make sure to set the exact password that was used to encrypt these files previously\n")
+            logging.warning(f"{encryptedFilesStr(qtnEncryptedFiles)} but the password.hash file appears to be missing. {set_same_pwd_str}\n")
             changePwdWithEncryptedFilesInfo()
         setPassword()
 
