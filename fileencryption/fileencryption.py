@@ -15,38 +15,13 @@ from gc import collect
 from os.path import dirname, getsize
 from os import fdopen, fsync, replace, remove
 from tempfile import mkstemp
-from multiprocessing import Pool
+from multiprocessing import Pool, freeze_support
 
 import logging
 import ctypes
+import traceback
 
 LARGE_FILE_SIZE = ((100*1024)*1024) # 100 MiB. Minimum size for files to be considered large
-
-if __name__ == "__main__":
-    kernel32 = ctypes.windll.kernel32
-    user32 = ctypes.windll.user32
-    hwnd = kernel32.GetConsoleWindow()
-
-    config_parser = RawConfigParser()
-    config_parser.read(r'config.cfg')
-
-    if config_parser.has_section('GENERAL'):
-        time_ctrl = int(config_parser.get('GENERAL', 'time_ctrl')) > 0
-        file_input_method = int(config_parser.get('GENERAL', 'file_input'))
-    else:
-        time_ctrl = False
-        file_input_method = 0
-
-    def set_focus():
-        sleep(0.1)
-        user32.SetForegroundWindow(hwnd)
-
-    root = Tk()
-    root.withdraw()
-    set_focus()
-    root.destroy()
-
-    logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
 
 def getPassword():
     with open("password.hash", "rb") as pwdFile:
@@ -544,6 +519,32 @@ def onSelectEncryptionOption(option):
         log_time_ctrl(t1, t2, "Whole process")
 
 if __name__ == "__main__":
+    freeze_support() # This is needed for multiprocessing to work when using PyInstaller to create an executable
+    kernel32 = ctypes.windll.kernel32
+    user32 = ctypes.windll.user32
+    hwnd = kernel32.GetConsoleWindow()
+
+    config_parser = RawConfigParser()
+    config_parser.read(r'config.cfg')
+
+    if config_parser.has_section('GENERAL'):
+        time_ctrl = int(config_parser.get('GENERAL', 'time_ctrl')) > 0
+        file_input_method = int(config_parser.get('GENERAL', 'file_input'))
+    else:
+        time_ctrl = False
+        file_input_method = 0
+
+    def set_focus():
+        sleep(0.1)
+        user32.SetForegroundWindow(hwnd)
+
+    root = Tk()
+    root.withdraw()
+    set_focus()
+    root.destroy()
+
+    logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
+
     print("\nChoose an option:")
     print("1. Set/Reset a password for cryptography;")
     print("2. Encrypt file(s) (allows input of multiple files);")
@@ -556,11 +557,14 @@ if __name__ == "__main__":
         logging.warning("INVALID OPTION!")
         opcao = int(input("Option: "))
 
-    if opcao == 1:
-        resetPassword()
-    elif opcao in [2, 3, 4]:
-        onSelectEncryptionOption(opcao)
-
-    print("\n*************** End of program ***************")
-
-    input("\nPress Enter to end this program")
+    try:
+        if opcao == 1:
+            resetPassword()
+        elif opcao in [2, 3, 4]:
+            onSelectEncryptionOption(opcao)
+    except Exception as e:
+        print("\n[!] An error occurred:")
+        traceback.print_exc()
+    finally:
+        print("\n*************** End of program ***************")
+        input("\nPress Enter to end this program")
