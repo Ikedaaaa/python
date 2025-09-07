@@ -22,34 +22,37 @@ import ctypes
 
 LARGE_FILE_SIZE = ((100*1024)*1024) # 100 MiB. Minimum size for files to be considered large
 
-kernel32 = ctypes.windll.kernel32
-user32 = ctypes.windll.user32
-hwnd = kernel32.GetConsoleWindow()
+if __name__ == "__main__":
+    kernel32 = ctypes.windll.kernel32
+    user32 = ctypes.windll.user32
+    hwnd = kernel32.GetConsoleWindow()
 
-config_parser = RawConfigParser()
-config_parser.read(r'config.cfg')
+    config_parser = RawConfigParser()
+    config_parser.read(r'config.cfg')
 
-if config_parser.has_section('GENERAL'):
-    time_ctrl = int(config_parser.get('GENERAL', 'time_ctrl')) > 0
-    file_input_method = int(config_parser.get('GENERAL', 'file_input'))
-else:
-    time_ctrl = False
-    file_input_method = 0
+    if config_parser.has_section('GENERAL'):
+        time_ctrl = int(config_parser.get('GENERAL', 'time_ctrl')) > 0
+        file_input_method = int(config_parser.get('GENERAL', 'file_input'))
+    else:
+        time_ctrl = False
+        file_input_method = 0
 
-def set_focus():
-    sleep(0.1)
-    user32.SetForegroundWindow(hwnd)
+    def set_focus():
+        sleep(0.1)
+        user32.SetForegroundWindow(hwnd)
 
-root = Tk()
-root.withdraw()
-set_focus()
-root.destroy()
+    root = Tk()
+    root.withdraw()
+    set_focus()
+    root.destroy()
+
+    logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
 
 def getPassword():
     with open("password.hash", "rb") as pwdFile:
         return pwdFile.read()
 
-def setPassword(second_password=False):
+def setPassword(hashes=[]):
     try:
         senha1 = bytearray(getpass("\nType your new password: ").encode())
         senha2 = bytearray(getpass("Confirm your new password: ").encode())
@@ -63,13 +66,8 @@ def setPassword(second_password=False):
         salt = generateSalt((workFactor if workFactor > 0 else 12))
 
         logging.info(f"Generating new Bcrypt hash with Work Factor of {(workFactor if workFactor > 0 else 12)}\n")
-        if second_password:
-            with open("password.hash", "ab") as pwdFile:
-                pwdFile.write(b'\r\n')
-                pwdFile.write(hashpw(bytes(senha1), salt))
-        else:
-            with open("password.hash", "wb") as pwdFile:
-                pwdFile.write(hashpw(bytes(senha1), salt))
+        hashes.append(hashpw(bytes(senha1), salt))
+        save_password_to_file(hashes)
 
         logging.info("New password set successfully\n")
     finally:
@@ -79,13 +77,20 @@ def setPassword(second_password=False):
         del senha1, senha2
         collect()
 
+def save_password_to_file(hashes_list):
+    with open("password.hash", "wb") as pwdFile:
+        for idx, hash in enumerate(hashes_list):
+            if idx > 0:
+                pwdFile.write(b'\r\n')
+            pwdFile.write(hash)
+
 def resetPassword():
     set_same_pwd_str = "Make sure to set the exact password that was used to encrypt these files previously"
     qtnEncryptedFiles = getQtnEncryptedFiles()
     try:
         hashes_list = getPassword().split(b'\r\n')
-
-        if len(hashes_list) > 0 and (len(hashes_list[0]) == 60):
+        valid_hashes = [valid_hash for valid_hash in hashes_list if len(valid_hash) == 60]
+        if len(valid_hashes) == len(hashes_list):
             reset_pwd = True
             add_password = False
             delete_password = False
@@ -97,7 +102,8 @@ def resetPassword():
                 print("\nDo you want to delete one of the passwords or change one of them?")
                 delete_password = (int(input("Type \"1\" to delete a password. Type any other number to reset one of them: ")) == 1)
                 reset_pwd = not delete_password
-
+            
+            print()
             if (qtnEncryptedFiles > 0) and (reset_pwd or delete_password):
                 logging.warning(f"{encryptedFilesStr(qtnEncryptedFiles)}")
                 changePwdWithEncryptedFilesInfo()
@@ -106,28 +112,36 @@ def resetPassword():
                     return
                 
             if add_password:
-                setPassword(True)
+                setPassword(hashes=valid_hashes)
             else:
                 try:
                     input_str_pwd = ("\nType your old password: " if reset_pwd else "\nType the password you want to delete: ")
                     password_input = bytearray(getpass(input_str_pwd).encode())
 
-                    if checkPassword(password_input, password_hash):
-                        print("****** Reset password ******")
-                        setPassword()
+                    logging.info(f"Checking Password\n")
+                    password_match, matched_hash = check_password_in_parallel(password_input, valid_hashes)
+                    
+                    if password_match:
+                        valid_hashes.remove(matched_hash)
+                        if reset_pwd:
+                            print("****** Reset password ******")
+                            setPassword(hashes=valid_hashes)
+                        elif delete_password:
+                            save_password_to_file(valid_hashes)
+                            logging.info("Password successfully deleted\n")
                     else:
                         logging.error("PASSWORDS DON'T MATCH")
                 finally:
-                    clear_bytearray(password_old)
-                    password_old = None
-                    del password_old
+                    clear_bytearray(password_input)
+                    password_input = None
+                    del password_input
                     collect()
         else:
             logging.warning("Invalid hash in the password.hash file. You will have to set a new password.\n")
             if qtnEncryptedFiles > 0:
                 logging.warning(f"{encryptedFilesStr(qtnEncryptedFiles)}")
                 logging.warning(f"{set_same_pwd_str}\n")
-            setPassword()
+            setPassword(hashes=valid_hashes)
             
     except FileNotFoundError:
         if qtnEncryptedFiles > 0:
@@ -135,19 +149,24 @@ def resetPassword():
             changePwdWithEncryptedFilesInfo()
         setPassword()
 
-def checkPassword(password_input, password_old_hash=""):
-    logging.info(f"Checking Password\n")
-    password_hash = getPassword() if password_old_hash == "" else password_old_hash
-    return checkpw(bytes(password_input), password_hash)
-
 def check_password_in_parallel(password_input, hashes):
     pool = Pool()
     result1 = pool.apply_async(checkpw, [bytes(password_input), hashes[0]])
-    result2 = pool.apply_async(checkpw, [bytes(password_input), hashes[1]])
+    result2 = None
+    if len(hashes) > 1:
+        result2 = pool.apply_async(checkpw, [bytes(password_input), hashes[1]])
     pool.close()
     answer1 = result1.get(timeout=60)
-    answer2 = result2.get(timeout=60)
-    pool.join()
+
+    answer2 = False
+    if len(hashes) > 1:
+        answer2 = result2.get(timeout=60)
+
+    if answer1:
+        return True, hashes[0]
+    if answer2:
+        return True, hashes[1]
+    return False, None
 
 def generateSalt(work_factor):
     return gensalt(rounds=work_factor)
@@ -338,18 +357,27 @@ def decrypt(pwd, files, option):
 def encrypt_decrypt(files, pwd, selected_option):
     if time_ctrl:
         t1 = perf_counter_ns()
-    
-    if checkPassword(pwd):
-        if time_ctrl:
-            t2 = perf_counter_ns()
-            log_time_ctrl(t1, t2, "Check password")
-        
-        if selected_option == 2:
-            encrypt(pwd, files)
-        else:
-            decrypt(pwd, files, selected_option)
+
+    hashes_list = getPassword().split(b'\r\n')
+    valid_hashes = [valid_hash for valid_hash in hashes_list if len(valid_hash) == 60]
+    if len(valid_hashes) == 0:
+        logging.error("No valid password hash found.\n")
     else:
-        logging.error("WRONG PASSWORD\n")
+        if len(valid_hashes) != len(hashes_list):
+            logging.warning("There is an invalid hash in the password.hash file.\n")
+        logging.info(f"Checking Password\n")
+
+        if check_password_in_parallel(pwd, valid_hashes)[0]:
+            if time_ctrl:
+                t2 = perf_counter_ns()
+                log_time_ctrl(t1, t2, "Check password")
+            
+            if selected_option == 2:
+                encrypt(pwd, files)
+            else:
+                decrypt(pwd, files, selected_option)
+        else:
+            logging.error("WRONG PASSWORD\n")
 
 def getQtnEncryptedFiles():
     try:
@@ -499,25 +527,24 @@ def onSelectEncryptionOption(option):
         t2 = perf_counter_ns()
         log_time_ctrl(t1, t2, "Whole process")
 
-logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
+if __name__ == "__main__":
+    print("\nChoose an option:")
+    print("1. Set/Reset a password for cryptography;")
+    print("2. Encrypt file(s) (allows input of multiple files);")
+    print("3. Decrypt file(s) (allows input of multiple files);")
+    print("4. Decrypt file and open it. When you close it, encrypt it again;")
+    print("0. End program.\n")
 
-print("\nChoose an option:")
-print("1. Set/Reset a password for cryptography;")
-print("2. Encrypt file(s) (allows input of multiple files);")
-print("3. Decrypt file(s) (allows input of multiple files);")
-print("4. Decrypt file and open it. When you close it, encrypt it again;")
-print("0. End program.\n")
-
-opcao = int(input("Option: "))
-while opcao not in [0, 1, 2, 3, 4]:
-    logging.warning("INVALID OPTION!")
     opcao = int(input("Option: "))
+    while opcao not in [0, 1, 2, 3, 4]:
+        logging.warning("INVALID OPTION!")
+        opcao = int(input("Option: "))
 
-if opcao == 1:
-    resetPassword()
-elif opcao in [2, 3, 4]:
-    onSelectEncryptionOption(opcao)
+    if opcao == 1:
+        resetPassword()
+    elif opcao in [2, 3, 4]:
+        onSelectEncryptionOption(opcao)
 
-print("\n*************** End of program ***************")
+    print("\n*************** End of program ***************")
 
-input("\nPress Enter to end this program")
+    input("\nPress Enter to end this program")
