@@ -9,7 +9,7 @@ from getpass import getpass
 from bcrypt import hashpw, checkpw, gensalt
 from subprocess import run
 from secrets import token_bytes
-from hashlib import sha256
+from hashlib import sha256, sha512
 from time import sleep, perf_counter_ns
 from gc import collect
 from os.path import dirname, getsize
@@ -51,6 +51,9 @@ if __name__ == "__main__":
 def getPassword():
     with open("password.hash", "rb") as pwdFile:
         return pwdFile.read()
+    
+def generateSalt(work_factor):
+    return gensalt(rounds=work_factor)
 
 def setPassword(hashes=[]):
     try:
@@ -63,18 +66,20 @@ def setPassword(hashes=[]):
             senha2 = bytearray(getpass("Confirm your new password: ").encode())
 
         workFactor = int(input("Salt work factor (0 to use the standard = 12): "))
-        salt = generateSalt((workFactor if workFactor > 0 else 12))
+        bcrypt_header_salt = generateSalt((workFactor if workFactor > 0 else 12))
+        salt = bcrypt_header_salt.split(b'$')[-1]
+        sha512_hash = sha512(salt + bytes(senha1)).digest()
 
         logging.info(f"Generating new Bcrypt hash with Work Factor of {(workFactor if workFactor > 0 else 12)}\n")
-        hashes.append(hashpw(bytes(senha1), salt))
+        hashes.append(hashpw(sha512_hash, bcrypt_header_salt))
         save_password_to_file(hashes)
 
         logging.info("New password set successfully\n")
     finally:
         clear_bytearray(senha1)
         clear_bytearray(senha2)
-        senha1 = senha2 = None
-        del senha1, senha2
+        senha1 = senha2 = sha512_hash = None
+        del senha1, senha2, sha512_hash
         collect()
 
 def save_password_to_file(hashes_list):
@@ -103,11 +108,10 @@ def resetPassword():
                 delete_password = (int(input("Type \"1\" to delete a password. Type any other number to reset one of them: ")) == 1)
                 reset_pwd = not delete_password
             
-            print()
             if (qtnEncryptedFiles > 0) and (reset_pwd or delete_password):
                 logging.warning(f"{encryptedFilesStr(qtnEncryptedFiles)}")
                 changePwdWithEncryptedFilesInfo()
-                print("Are you want to proceed?")
+                print("Are you sure you want to proceed?")
                 if (int(input("Type \"1\" to continue. Type any other number to abort: ")) != 1):
                     return
                 
@@ -151,26 +155,38 @@ def resetPassword():
 
 def check_password_in_parallel(password_input, hashes):
     pool = Pool()
-    result1 = pool.apply_async(checkpw, [bytes(password_input), hashes[0]])
-    result2 = None
-    if len(hashes) > 1:
-        result2 = pool.apply_async(checkpw, [bytes(password_input), hashes[1]])
-    pool.close()
-    answer1 = result1.get(timeout=60)
+    sha512_hash = get_sha512_hash(password_input, hashes[0])
+    sha512_2_hash = None
+    try:
+        result1 = pool.apply_async(checkpw, [sha512_hash, hashes[0]])
+        result2 = None
+        if len(hashes) > 1:
+            sha512_2_hash = get_sha512_hash(password_input, hashes[1])
+            result2 = pool.apply_async(checkpw, [sha512_2_hash, hashes[1]])
+        pool.close()
+        answer1 = result1.get(timeout=60)
 
-    answer2 = False
-    if len(hashes) > 1:
-        answer2 = result2.get(timeout=60)
+        answer2 = False
+        if len(hashes) > 1:
+            answer2 = result2.get(timeout=60)
 
-    if answer1:
-        return True, hashes[0]
-    if answer2:
-        return True, hashes[1]
-    return False, None
+        if answer1:
+            return True, hashes[0]
+        if answer2:
+            return True, hashes[1]
+        return False, None
+    except Exception as e:
+        raise e
+    finally:
+        pool.terminate()
+        pool = sha512_hash = sha512_2_hash = None
+        del pool, sha512_hash, sha512_2_hash
+        collect()
 
-def generateSalt(work_factor):
-    return gensalt(rounds=work_factor)
-    
+def get_sha512_hash(password_input, hash):
+    salt = hash.split(b'$')[-1][:22]
+    return sha512(salt + bytes(password_input)).digest()
+
 def deriveKey(p_salt, password):
     kdf = Argon2id(
         salt=p_salt,
